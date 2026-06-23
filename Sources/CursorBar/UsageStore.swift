@@ -60,6 +60,19 @@ final class UsageStore: ObservableObject {
         summary?.individualUsage.plan.breakdown.total
     }
 
+    /// Guaranteed minimum included credits for auto / composer usage ($200).
+    static let minimumAutoComposerIncludedCents = 20_000
+    /// Guaranteed minimum included credits for named-model API usage ($400).
+    static let minimumApiIncludedCents = 40_000
+    /// Floor for the included pool; the API can under-report `breakdown.total`.
+    static let minimumIncludedCreditsCents = minimumAutoComposerIncludedCents + minimumApiIncludedCents
+
+    /// Included pool size, floored to the known minimum allowances.
+    var includedLimitCreditsCents: Int? {
+        guard let totalCreditsCents else { return nil }
+        return max(totalCreditsCents, Self.minimumIncludedCreditsCents)
+    }
+
     /// Plan usage reported by the API (included + bonus pool only; on-demand is tracked separately).
     var rawUsedCreditsCents: Int? {
         guard let summary else { return nil }
@@ -70,19 +83,27 @@ final class UsageStore: ObservableObject {
 
     /// Amount consumed from the included + bonus pool, capped at the pool size.
     var includedUsedCreditsCents: Int? {
-        guard let rawUsedCreditsCents, let totalCreditsCents else { return nil }
-        return min(rawUsedCreditsCents, totalCreditsCents)
+        guard let rawUsedCreditsCents, let includedLimitCreditsCents else { return nil }
+        return min(rawUsedCreditsCents, includedLimitCreditsCents)
     }
 
     /// Included pool usage percentage, capped at 100%.
     var includedPercentUsed: Double? {
-        guard let percent = summary?.individualUsage.plan.totalPercentUsed else { return nil }
-        return min(percent, 100)
+        guard let used = includedUsedCreditsCents,
+              let limit = includedLimitCreditsCents,
+              limit > 0
+        else { return nil }
+        return min(Double(used) / Double(limit) * 100.0, 100)
     }
 
     /// Auto / composer usage as a percentage of its sub-limit.
     var autoPercentUsed: Double? {
-        summary?.individualUsage.plan.autoPercentUsed
+        guard summary?.individualUsage.plan.autoPercentUsed != nil else { return nil }
+        guard let used = autoUsedCreditsCents,
+              let limit = autoLimitCreditsCents,
+              limit > 0
+        else { return nil }
+        return min(Double(used) / Double(limit) * 100.0, 100)
     }
 
     /// Named-model API usage as a percentage of its sub-limit.
@@ -110,11 +131,15 @@ final class UsageStore: ObservableObject {
 
     /// Auto / composer sub-limit derived from used amount and auto percentage.
     var autoLimitCreditsCents: Int? {
-        guard let autoUsed = autoUsedCreditsCents,
-              let percent = autoPercentUsed,
-              percent > 0
-        else { return nil }
-        return Int((Double(autoUsed) / (percent / 100.0)).rounded())
+        guard summary?.individualUsage.plan.autoPercentUsed != nil else { return nil }
+        let derived: Int? = {
+            guard let autoUsed = autoUsedCreditsCents,
+                  let percent = summary?.individualUsage.plan.autoPercentUsed,
+                  percent > 0
+            else { return nil }
+            return Int((Double(autoUsed) / (percent / 100.0)).rounded())
+        }()
+        return max(derived ?? 0, Self.minimumAutoComposerIncludedCents)
     }
 
     var autoStatusColor: Color {
@@ -133,8 +158,8 @@ final class UsageStore: ObservableObject {
     }
 
     var includedRemainingCreditsCents: Int? {
-        guard let totalCreditsCents, let includedUsedCreditsCents else { return nil }
-        return max(totalCreditsCents - includedUsedCreditsCents, 0)
+        guard let includedLimitCreditsCents, let includedUsedCreditsCents else { return nil }
+        return max(includedLimitCreditsCents - includedUsedCreditsCents, 0)
     }
 
     var onDemandEnabled: Bool {
@@ -186,8 +211,8 @@ final class UsageStore: ObservableObject {
 
     /// Total quota divided by working days in the billing cycle.
     var dailyBudgetCents: Int? {
-        guard let totalCreditsCents, let workingDaysInCycle else { return nil }
-        return totalCreditsCents / workingDaysInCycle
+        guard let includedLimitCreditsCents, let workingDaysInCycle else { return nil }
+        return includedLimitCreditsCents / workingDaysInCycle
     }
 
     /// Today's spend as a percentage of the daily budget. Can exceed 100%.

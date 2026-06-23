@@ -495,7 +495,7 @@ private struct MenuContentView: View {
                         percent: percentUsed,
                         color: store.statusColor,
                         usedCents: store.includedUsedCreditsCents,
-                        limitCents: store.totalCreditsCents,
+                        limitCents: store.includedLimitCreditsCents,
                         remainingCents: store.includedRemainingCreditsCents
                     )
                 }

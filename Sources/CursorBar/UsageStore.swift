@@ -56,90 +56,80 @@ final class UsageStore: ObservableObject {
         summary?.membershipType.capitalized ?? "Unknown"
     }
 
-    var totalCreditsCents: Int? {
-        summary?.individualUsage.plan.breakdown.total
-    }
-
     /// Guaranteed minimum included credits for auto / composer usage ($200).
     static let minimumAutoComposerIncludedCents = 20_000
     /// Guaranteed minimum included credits for named-model API usage ($400).
     static let minimumApiIncludedCents = 40_000
-    /// Floor for the included pool; the API can under-report `breakdown.total`.
+    /// Floor for the included pool when the API reports no usage yet.
     static let minimumIncludedCreditsCents = minimumAutoComposerIncludedCents + minimumApiIncludedCents
 
-    /// Included pool size, floored to the known minimum allowances.
-    var includedLimitCreditsCents: Int? {
-        guard let totalCreditsCents else { return nil }
-        return max(totalCreditsCents, Self.minimumIncludedCreditsCents)
-    }
-
-    /// Plan usage reported by the API (included + bonus pool only; on-demand is tracked separately).
-    var rawUsedCreditsCents: Int? {
-        guard let summary else { return nil }
-        let total = Double(summary.individualUsage.plan.breakdown.total)
-        let percent = summary.individualUsage.plan.totalPercentUsed
-        return Int((total * percent / 100.0).rounded())
-    }
-
-    /// Amount consumed from the included + bonus pool, capped at the pool size.
+    /// Total included credits consumed so far (auto + API), reported directly by the API.
+    /// `breakdown.total` is the *used* amount broken into included + bonus, not the pool size.
     var includedUsedCreditsCents: Int? {
-        guard let rawUsedCreditsCents, let includedLimitCreditsCents else { return nil }
-        return min(rawUsedCreditsCents, includedLimitCreditsCents)
+        summary?.individualUsage.plan.breakdown.total
     }
 
-    /// Included pool usage percentage, capped at 100%.
+    /// Included pool size. The API does not expose the pool directly, so recover it from the
+    /// used amount and the reported percentage: pool = used / (percent / 100).
+    var includedLimitCreditsCents: Int? {
+        guard let used = includedUsedCreditsCents else { return nil }
+        let percent = summary?.individualUsage.plan.totalPercentUsed ?? 0
+        let derived = percent > 0 ? Int((Double(used) / (percent / 100.0)).rounded()) : 0
+        return max(derived, Self.minimumIncludedCreditsCents)
+    }
+
+    /// Included pool size; alias retained for overspend accounting.
+    var totalCreditsCents: Int? {
+        includedLimitCreditsCents
+    }
+
+    /// Included pool usage percentage, as reported by Cursor.
     var includedPercentUsed: Double? {
-        guard let used = includedUsedCreditsCents,
-              let limit = includedLimitCreditsCents,
-              limit > 0
-        else { return nil }
-        return min(Double(used) / Double(limit) * 100.0, 100)
+        guard summary != nil, includedUsedCreditsCents != nil else { return nil }
+        return summary?.individualUsage.plan.totalPercentUsed
     }
 
-    /// Auto / composer usage as a percentage of its sub-limit.
+    /// Auto / composer usage as a percentage of its sub-limit, as reported by Cursor.
     var autoPercentUsed: Double? {
-        guard summary?.individualUsage.plan.autoPercentUsed != nil else { return nil }
-        guard let used = autoUsedCreditsCents,
-              let limit = autoLimitCreditsCents,
-              limit > 0
-        else { return nil }
-        return min(Double(used) / Double(limit) * 100.0, 100)
+        guard summary != nil else { return nil }
+        return summary?.individualUsage.plan.autoPercentUsed
     }
 
-    /// Named-model API usage as a percentage of its sub-limit.
+    /// Named-model API usage as a percentage of its sub-limit, as reported by Cursor.
     var apiPercentUsed: Double? {
         summary?.individualUsage.plan.apiPercentUsed
     }
 
-    var apiUsedCreditsCents: Int? {
-        guard summary?.individualUsage.plan.enabled == true else { return nil }
-        return summary?.individualUsage.plan.used
-    }
-
+    /// Named-model API included sub-limit (e.g. $400).
     var apiLimitCreditsCents: Int? {
         guard summary?.individualUsage.plan.enabled == true else { return nil }
         return summary?.individualUsage.plan.limit
     }
 
-    /// Auto / composer spend inferred from total included usage minus API usage.
-    var autoUsedCreditsCents: Int? {
-        guard let totalUsed = includedUsedCreditsCents,
-              let apiUsed = apiUsedCreditsCents
+    /// API credits consumed, derived from the sub-limit and reported percentage so the dollar
+    /// figure stays consistent with the percentage Cursor displays.
+    var apiUsedCreditsCents: Int? {
+        guard summary?.individualUsage.plan.enabled == true,
+              let limit = apiLimitCreditsCents,
+              let percent = summary?.individualUsage.plan.apiPercentUsed
         else { return nil }
-        return max(totalUsed - apiUsed, 0)
+        return Int((Double(limit) * percent / 100.0).rounded())
     }
 
-    /// Auto / composer sub-limit derived from used amount and auto percentage.
+    /// Auto / composer sub-limit: the included pool minus the API sub-limit.
     var autoLimitCreditsCents: Int? {
-        guard summary?.individualUsage.plan.autoPercentUsed != nil else { return nil }
-        let derived: Int? = {
-            guard let autoUsed = autoUsedCreditsCents,
-                  let percent = summary?.individualUsage.plan.autoPercentUsed,
-                  percent > 0
-            else { return nil }
-            return Int((Double(autoUsed) / (percent / 100.0)).rounded())
-        }()
-        return max(derived ?? 0, Self.minimumAutoComposerIncludedCents)
+        guard let includedLimit = includedLimitCreditsCents,
+              let apiLimit = apiLimitCreditsCents
+        else { return nil }
+        return max(includedLimit - apiLimit, Self.minimumAutoComposerIncludedCents)
+    }
+
+    /// Auto / composer credits consumed, derived from its sub-limit and reported percentage.
+    var autoUsedCreditsCents: Int? {
+        guard let limit = autoLimitCreditsCents,
+              let percent = summary?.individualUsage.plan.autoPercentUsed
+        else { return nil }
+        return Int((Double(limit) * percent / 100.0).rounded())
     }
 
     var autoStatusColor: Color {
@@ -178,10 +168,10 @@ final class UsageStore: ObservableObject {
         summary?.individualUsage.onDemand.remaining
     }
 
-    /// Usage beyond the included + bonus credit pool.
+    /// Usage beyond the included credit pool.
     var includedOverageCents: Int {
-        guard let rawUsedCreditsCents, let totalCreditsCents else { return 0 }
-        return max(rawUsedCreditsCents - totalCreditsCents, 0)
+        guard let used = includedUsedCreditsCents, let limit = includedLimitCreditsCents else { return 0 }
+        return max(used - limit, 0)
     }
 
     var overspendCents: Int {

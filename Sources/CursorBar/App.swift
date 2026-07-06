@@ -20,9 +20,9 @@ enum CursorBarMain {
                 let summary = try await CursorAPI.fetchUsageSummary()
                 let plan = summary.individualUsage.plan
                 let onDemand = summary.individualUsage.onDemand
-                let total = Double(plan.breakdown.total)
-                let rawUsed = total * plan.totalPercentUsed / 100.0
-                let overage = max(rawUsed - total, 0)
+                let used = Double(plan.breakdown.total)
+                let pool = plan.totalPercentUsed > 0 ? used / (plan.totalPercentUsed / 100.0) : 0
+                let overage = max(used - pool, 0)
                 let onDemandUsed = onDemand.enabled ? Double(onDemand.used) : 0
                 let overspend = overage + onDemandUsed
                 let percent = min(plan.totalPercentUsed, 100)

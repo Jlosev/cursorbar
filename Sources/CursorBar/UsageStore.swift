@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import PaceCore
 
 @MainActor
 final class UsageStore: ObservableObject {
@@ -185,18 +186,62 @@ final class UsageStore: ObservableObject {
     /// Mon-Fri days between billing cycle start and end.
     var workingDaysInCycle: Int? {
         guard let start = billingCycleStartDate, let end = billingCycleEndDate, start < end else { return nil }
-        let calendar = Calendar.current
-        var count = 0
-        var day = calendar.startOfDay(for: start)
-        let lastDay = calendar.startOfDay(for: end)
-        while day < lastDay {
-            if !calendar.isDateInWeekend(day) {
-                count += 1
-            }
-            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
-            day = next
-        }
+        let count = PaceCalculator.workingDays(from: start, to: end)
         return count > 0 ? count : nil
+    }
+
+    /// Workdays from cycle start through today (inclusive), clamped to cycle end.
+    /// Uses endExclusive = startOfDay(tomorrow) ∩ cycleEnd so the current weekday counts.
+    var elapsedWorkingDaysInCycle: Int? {
+        guard let start = billingCycleStartDate, let end = billingCycleEndDate, start < end else { return nil }
+        let calendar = Calendar.current
+        let now = Date()
+        guard now >= start else { return 0 }
+        let endExclusive = PaceCalculator.elapsedEndExclusive(now: now, cycleEnd: end, calendar: calendar)
+        return PaceCalculator.workingDays(from: start, to: endExclusive, calendar: calendar)
+    }
+
+    var paceFootnote: String? {
+        guard let total = workingDaysInCycle else { return nil }
+        let elapsed = elapsedWorkingDaysInCycle ?? 0
+        return "Pace = pool% ÷ (\(elapsed)/\(total) workdays)"
+    }
+
+    var autoPacePercent: Double? {
+        guard let pool = autoPercentUsed,
+              let elapsed = elapsedWorkingDaysInCycle,
+              let total = workingDaysInCycle
+        else { return nil }
+        return PaceCalculator.pacePercent(
+            poolPercentUsed: pool,
+            elapsedWorkdays: elapsed,
+            totalWorkdays: total
+        )
+    }
+
+    var apiPacePercent: Double? {
+        guard let pool = apiPercentUsed,
+              let elapsed = elapsedWorkingDaysInCycle,
+              let total = workingDaysInCycle
+        else { return nil }
+        return PaceCalculator.pacePercent(
+            poolPercentUsed: pool,
+            elapsedWorkdays: elapsed,
+            totalWorkdays: total
+        )
+    }
+
+    /// Same thresholds as upstream pool meters; values >100 are ≥90 so they stay red.
+    static func paceStatusColor(for percent: Double?) -> Color {
+        Self.statusColor(for: percent)
+    }
+
+    var autoPaceStatusColor: Color {
+        Self.paceStatusColor(for: autoPacePercent)
+    }
+
+    var apiPaceStatusColor: Color {
+        Self.paceStatusColor(for: apiPacePercent)
     }
 
     /// Total quota divided by working days in the billing cycle.

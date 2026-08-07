@@ -69,6 +69,8 @@ struct CursorBarApp: App {
 
 enum MenuBarPrefs {
     static let showQuotaKey = "menuBarShowQuota"
+    static let showAutoPaceKey = "menuBarShowAutoPace"
+    static let showApiPaceKey = "menuBarShowApiPace"
     static let showDailyKey = "menuBarShowDaily"
     static let showOverspendKey = "menuBarShowOverspend"
     static let showAgentsKey = "menuBarShowAgents"
@@ -77,8 +79,10 @@ enum MenuBarPrefs {
 private struct MenuBarLabel: View {
     @ObservedObject var store: UsageStore
     @ObservedObject var agents: AgentMonitor
-    @AppStorage(MenuBarPrefs.showQuotaKey) private var showQuota = true
-    @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = true
+    @AppStorage(MenuBarPrefs.showQuotaKey) private var showQuota = false
+    @AppStorage(MenuBarPrefs.showAutoPaceKey) private var showAutoPace = true
+    @AppStorage(MenuBarPrefs.showApiPaceKey) private var showApiPace = true
+    @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = false
     @AppStorage(MenuBarPrefs.showOverspendKey) private var showOverspend = true
     @AppStorage(MenuBarPrefs.showAgentsKey) private var showAgents = true
 
@@ -97,7 +101,12 @@ private struct MenuBarLabel: View {
     }
 
     private var hasVisibleContent: Bool {
-        showAgents || showQuota || showDaily || (showOverspend && store.hasOverspend)
+        showAgents
+            || showQuota
+            || showAutoPace
+            || showApiPace
+            || showDaily
+            || (showOverspend && store.hasOverspend)
     }
 
     private var renderedImage: NSImage? {
@@ -115,6 +124,22 @@ private struct MenuBarLabel: View {
                     percent: store.includedPercentUsed,
                     fillColor: store.statusColor,
                     isDark: isDark
+                )
+            }
+            if showAutoPace {
+                MenuBarBarGauge(
+                    percent: store.autoPacePercent,
+                    fillColor: store.autoPaceStatusColor,
+                    isDark: isDark,
+                    prefix: "A"
+                )
+            }
+            if showApiPace {
+                MenuBarBarGauge(
+                    percent: store.apiPacePercent,
+                    fillColor: store.apiPaceStatusColor,
+                    isDark: isDark,
+                    prefix: "P"
                 )
             }
             if showDaily {
@@ -223,6 +248,7 @@ private struct MenuBarBarGauge: View {
     let percent: Double?
     let fillColor: Color
     let isDark: Bool
+    var prefix: String? = nil
 
     private var textColor: Color {
         isDark ? .white : .black
@@ -233,8 +259,20 @@ private struct MenuBarBarGauge: View {
     }
 
     private var valueText: String {
-        guard let percent else { return "–" }
-        return "\(Int(percent.rounded()))%"
+        let body: String
+        if let percent {
+            body = "\(Int(percent.rounded()))%"
+        } else {
+            body = "–"
+        }
+        if let prefix {
+            return "\(prefix)\(body)"
+        }
+        return body
+    }
+
+    private var width: CGFloat {
+        prefix == nil ? 38 : 46
     }
 
     var body: some View {
@@ -252,11 +290,11 @@ private struct MenuBarBarGauge: View {
             }
 
             Text(valueText)
-                .font(.system(size: 9, weight: .semibold, design: .monospaced))
+                .font(.system(size: prefix == nil ? 9 : 8, weight: .semibold, design: .monospaced))
                 .foregroundStyle(textColor)
                 .shadow(color: isDark ? .black.opacity(0.4) : .white.opacity(0.4), radius: 0.5)
         }
-        .frame(width: 38, height: 16)
+        .frame(width: width, height: 16)
         .clipShape(RoundedRectangle(cornerRadius: 4))
     }
 }
@@ -321,8 +359,10 @@ private struct MenuContentView: View {
     @ObservedObject var updater: UpdateChecker
     @ObservedObject var agents: AgentMonitor
     @State private var showSettings = false
-    @AppStorage(MenuBarPrefs.showQuotaKey) private var showQuota = true
-    @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = true
+    @AppStorage(MenuBarPrefs.showQuotaKey) private var showQuota = false
+    @AppStorage(MenuBarPrefs.showAutoPaceKey) private var showAutoPace = true
+    @AppStorage(MenuBarPrefs.showApiPaceKey) private var showApiPace = true
+    @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = false
     @AppStorage(MenuBarPrefs.showOverspendKey) private var showOverspend = true
     @AppStorage(MenuBarPrefs.showAgentsKey) private var showAgents = true
 
@@ -366,7 +406,9 @@ private struct MenuContentView: View {
 
             Toggle("Agents badge", isOn: $showAgents)
             Toggle("Quota gauge", isOn: $showQuota)
-            Toggle("Daily utilization gauge", isOn: $showDaily)
+            Toggle("Auto pace (A)", isOn: $showAutoPace)
+            Toggle("API pace (P)", isOn: $showApiPace)
+            Toggle("Daily utilization (legacy)", isOn: $showDaily)
             Toggle("Overspend amount", isOn: $showOverspend)
         }
         .toggleStyle(.checkbox)
@@ -461,7 +503,7 @@ private struct MenuContentView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("CursorBar")
+                Text("CursorBar Pace")
                     .font(.headline)
                 Spacer()
                 Text(store.planDisplayName)
@@ -484,8 +526,8 @@ private struct MenuContentView: View {
     @ViewBuilder
     private var usageSection: some View {
         let hasBillingMeters = store.includedPercentUsed != nil
-            || store.autoPercentUsed != nil
-            || store.apiPercentUsed != nil
+            || store.autoPacePercent != nil
+            || store.apiPacePercent != nil
 
         if hasBillingMeters {
             VStack(alignment: .leading, spacing: 10) {
@@ -500,23 +542,25 @@ private struct MenuContentView: View {
                     )
                 }
 
-                if let autoPercent = store.autoPercentUsed {
+                if let autoPace = store.autoPacePercent {
                     UsageMeterView(
-                        title: "Auto / Composer",
-                        percent: autoPercent,
-                        color: store.autoStatusColor,
+                        title: "Auto pace",
+                        percent: autoPace,
+                        color: store.autoPaceStatusColor,
                         usedCents: store.autoUsedCreditsCents,
-                        limitCents: store.autoLimitCreditsCents
+                        limitCents: store.autoLimitCreditsCents,
+                        footnote: store.paceFootnote
                     )
                 }
 
-                if let apiPercent = store.apiPercentUsed {
+                if let apiPace = store.apiPacePercent {
                     UsageMeterView(
-                        title: "API",
-                        percent: apiPercent,
-                        color: store.apiStatusColor,
+                        title: "API pace",
+                        percent: apiPace,
+                        color: store.apiPaceStatusColor,
                         usedCents: store.apiUsedCreditsCents,
-                        limitCents: store.apiLimitCreditsCents
+                        limitCents: store.apiLimitCreditsCents,
+                        footnote: store.paceFootnote
                     )
                 }
             }
@@ -528,13 +572,13 @@ private struct MenuContentView: View {
 
         if let dailyPercent = store.dailyUtilizationPercent {
             UsageMeterView(
-                title: "Daily utilization",
+                title: "Daily (legacy/total)",
                 percent: dailyPercent,
                 color: store.dailyStatusColor,
                 usedCents: store.todaySpendCents,
                 limitCents: store.dailyBudgetCents,
                 usedLabel: "Today",
-                footnote: store.workingDaysInCycle.map { "Daily budget = quota / \($0) working days" }
+                footnote: store.workingDaysInCycle.map { "Mixed Auto+API · budget = quota / \($0) workdays" }
             )
         }
 

@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "CursorBar",
+    name: "CursorBarPace",
     platforms: [.macOS(.v14)],
     targets: [
         .target(
@@ -10,8 +10,7 @@ let package = Package(
             path: "Sources/PaceCore"
         ),
         .executableTarget(
-            // Keep product name CursorBar until Task 4 so scripts/package.sh still works mid-branch.
-            name: "CursorBar",
+            name: "CursorBarPace",
             dependencies: ["PaceCore"],
             path: "Sources/CursorBar",
             linkerSettings: [.linkedLibrary("sqlite3")]

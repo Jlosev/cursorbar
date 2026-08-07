@@ -4,4 +4,6 @@ DerivedData/
 *.xcodeproj/
 CursorBar.app/
 CursorBar-*.zip
+CursorBarPace.app/
+CursorBarPace-*.zip
 .DS_Store

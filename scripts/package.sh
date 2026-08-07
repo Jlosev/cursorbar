@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP_NAME="CursorBar"
+APP_NAME="CursorBarPace"
 BUILD_DIR="$ROOT/.build/release"
 APP_BUNDLE="$ROOT/$APP_NAME.app"
 VERSION="${VERSION:-1.0.0}"
@@ -28,13 +28,13 @@ cat > "$APP_BUNDLE/Contents/Info.plist" <<EOF
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
     <key>CFBundleExecutable</key>
-    <string>CursorBar</string>
+    <string>CursorBarPace</string>
     <key>CFBundleIdentifier</key>
-    <string>com.cursorbar.app</string>
+    <string>com.cursorbar.pace</string>
     <key>CFBundleInfoDictionaryVersion</key>
     <string>6.0</string>
     <key>CFBundleName</key>
-    <string>CursorBar</string>
+    <string>CursorBar Pace</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>

@@ -1,4 +1,26 @@
-# CursorBar
+# cursorbar-pace
+
+Personal fork of [CursorBar](https://github.com/c-johannesen/cursorbar) with **Auto** and **API pace** bars in the menu bar — spend rate vs working-day fraction of the billing cycle, so API quota is not burned early.
+
+**Docs:** product hub and requirements live in Obsidian (`docs/` symlink in the main repo layout). See `CursorBar Pace – Hub.md` and `Specs/2026-08-07 – Requirements.md`.
+
+### Fork features
+
+- **Auto pace (`A`) and API pace (`P`)** — each pool's % used divided by elapsed/total working days in the billing cycle
+- **Mixed daily utilization (`D`)** — optional legacy toggle, off by default
+- **Installs as `CursorBarPace.app`** (`com.cursorbar.pace`) — Homebrew `CursorBar` is untouched
+- **Upstream auto-update disabled** — fork does not pull `c-johannesen/cursorbar` releases
+
+### Build & install (fork)
+
+```bash
+bash scripts/package.sh --install --open
+open -a CursorBarPace
+```
+
+---
+
+# CursorBar (upstream)
 
 A lightweight macOS menu bar app that shows your Cursor plan usage and how much you have left this billing cycle.
 

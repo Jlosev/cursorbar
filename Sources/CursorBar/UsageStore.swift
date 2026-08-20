@@ -133,6 +133,16 @@ final class UsageStore: ObservableObject {
         return Int((Double(limit) * percent / 100.0).rounded())
     }
 
+    var apiRemainingCreditsCents: Int? {
+        guard let limit = apiLimitCreditsCents, let used = apiUsedCreditsCents else { return nil }
+        return max(limit - used, 0)
+    }
+
+    var autoRemainingCreditsCents: Int? {
+        guard let limit = autoLimitCreditsCents, let used = autoUsedCreditsCents else { return nil }
+        return max(limit - used, 0)
+    }
+
     var autoStatusColor: Color {
         Self.statusColor(for: autoPercentUsed)
     }
@@ -201,47 +211,103 @@ final class UsageStore: ObservableObject {
         return PaceCalculator.workingDays(from: start, to: endExclusive, calendar: calendar)
     }
 
-    var paceFootnote: String? {
-        guard let total = workingDaysInCycle else { return nil }
-        let elapsed = elapsedWorkingDaysInCycle ?? 0
-        return "Pace = pool% ÷ (\(elapsed)/\(total) workdays)"
+    /// Workdays from today through billing cycle end (today inclusive).
+    var remainingWorkingDaysInCycle: Int? {
+        guard let end = billingCycleEndDate else { return nil }
+        let count = PaceCalculator.remainingWorkdays(now: Date(), cycleEnd: end)
+        return count
     }
 
-    var autoPacePercent: Double? {
-        guard let pool = autoPercentUsed,
-              let elapsed = elapsedWorkingDaysInCycle,
-              let total = workingDaysInCycle
+    var autoDailyBudgetCents: Int? {
+        guard let remaining = autoRemainingCreditsCents,
+              let days = remainingWorkingDaysInCycle
         else { return nil }
-        return PaceCalculator.pacePercent(
-            poolPercentUsed: pool,
-            elapsedWorkdays: elapsed,
-            totalWorkdays: total
-        )
+        return PaceCalculator.dailyBudgetCents(remainingCents: remaining, remainingWorkdays: days)
     }
 
-    var apiPacePercent: Double? {
-        guard let pool = apiPercentUsed,
-              let elapsed = elapsedWorkingDaysInCycle,
-              let total = workingDaysInCycle
+    var apiDailyBudgetCents: Int? {
+        guard let remaining = apiRemainingCreditsCents,
+              let days = remainingWorkingDaysInCycle
         else { return nil }
-        return PaceCalculator.pacePercent(
-            poolPercentUsed: pool,
-            elapsedWorkdays: elapsed,
-            totalWorkdays: total
-        )
+        return PaceCalculator.dailyBudgetCents(remainingCents: remaining, remainingWorkdays: days)
     }
 
-    /// Same thresholds as upstream pool meters; values >100 are ≥90 so they stay red.
-    static func paceStatusColor(for percent: Double?) -> Color {
-        Self.statusColor(for: percent)
+    var autoAvgDailyCents: Int? {
+        guard let used = autoUsedCreditsCents,
+              let elapsed = elapsedWorkingDaysInCycle
+        else { return nil }
+        return PaceCalculator.avgDailyCents(usedCents: used, elapsedWorkdays: elapsed)
     }
 
-    var autoPaceStatusColor: Color {
-        Self.paceStatusColor(for: autoPacePercent)
+    var apiAvgDailyCents: Int? {
+        guard let used = apiUsedCreditsCents,
+              let elapsed = elapsedWorkingDaysInCycle
+        else { return nil }
+        return PaceCalculator.avgDailyCents(usedCents: used, elapsedWorkdays: elapsed)
     }
 
-    var apiPaceStatusColor: Color {
-        Self.paceStatusColor(for: apiPacePercent)
+    var autoDailyUtilizationPercent: Double? {
+        guard let avg = autoAvgDailyCents, let budget = autoDailyBudgetCents else { return nil }
+        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: avg, dailyBudgetCents: budget)
+    }
+
+    var apiDailyUtilizationPercent: Double? {
+        guard let avg = apiAvgDailyCents, let budget = apiDailyBudgetCents else { return nil }
+        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: avg, dailyBudgetCents: budget)
+    }
+
+    var apiDailyUtilizationPercentForDisplay: Double? {
+        if let pct = apiDailyUtilizationPercent { return pct }
+        if (apiDailyBudgetCents ?? -1) == 0, (apiAvgDailyCents ?? 0) > 0 { return 100 }
+        return nil
+    }
+
+    var autoDailyUtilizationPercentForDisplay: Double? {
+        if let pct = autoDailyUtilizationPercent { return pct }
+        if (autoDailyBudgetCents ?? -1) == 0, (autoAvgDailyCents ?? 0) > 0 { return 100 }
+        return nil
+    }
+
+    /// Same thresholds as mixed daily: >100 red, ≥70 yellow.
+    static func poolDailyStatusColor(for percent: Double?) -> Color {
+        guard let percent else { return .secondary }
+        if percent > 100 { return .red }
+        if percent >= 70 { return .yellow }
+        return .green
+    }
+
+    var autoDailyStatusColor: Color {
+        if (autoDailyBudgetCents ?? -1) == 0, (autoAvgDailyCents ?? 0) > 0 { return .red }
+        return Self.poolDailyStatusColor(for: autoDailyUtilizationPercent)
+    }
+
+    var apiDailyStatusColor: Color {
+        if (apiDailyBudgetCents ?? -1) == 0, (apiAvgDailyCents ?? 0) > 0 { return .red }
+        return Self.poolDailyStatusColor(for: apiDailyUtilizationPercent)
+    }
+
+    func dailyFootnote(poolLabel: String, remainingCents: Int?, budgetCents: Int?) -> String? {
+        guard let days = remainingWorkingDaysInCycle,
+              let remainingCents,
+              let budgetCents
+        else { return nil }
+        let rem = Self.formatDollars(cents: remainingCents)
+        let bud = Self.formatDollars(cents: budgetCents)
+        return "\(poolLabel) daily = \(rem) left ÷ \(max(days, 1)) workdays → \(bud)/day"
+    }
+
+    var autoDailyFootnote: String? {
+        if (autoDailyBudgetCents ?? -1) == 0, (autoAvgDailyCents ?? 0) > 0 {
+            return "$0/day left · pool exhausted"
+        }
+        return dailyFootnote(poolLabel: "Auto", remainingCents: autoRemainingCreditsCents, budgetCents: autoDailyBudgetCents)
+    }
+
+    var apiDailyFootnote: String? {
+        if (apiDailyBudgetCents ?? -1) == 0, (apiAvgDailyCents ?? 0) > 0 {
+            return "$0/day left · pool exhausted"
+        }
+        return dailyFootnote(poolLabel: "API", remainingCents: apiRemainingCreditsCents, budgetCents: apiDailyBudgetCents)
     }
 
     /// Total quota divided by working days in the billing cycle.

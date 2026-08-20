@@ -128,16 +128,16 @@ private struct MenuBarLabel: View {
             }
             if showAutoPace {
                 MenuBarBarGauge(
-                    percent: store.autoPacePercent,
-                    fillColor: store.autoPaceStatusColor,
+                    percent: store.autoDailyUtilizationPercentForDisplay,
+                    fillColor: store.autoDailyStatusColor,
                     isDark: isDark,
                     prefix: "A"
                 )
             }
             if showApiPace {
                 MenuBarBarGauge(
-                    percent: store.apiPacePercent,
-                    fillColor: store.apiPaceStatusColor,
+                    percent: store.apiDailyUtilizationPercentForDisplay,
+                    fillColor: store.apiDailyStatusColor,
                     isDark: isDark,
                     prefix: "P"
                 )
@@ -406,9 +406,9 @@ private struct MenuContentView: View {
 
             Toggle("Agents badge", isOn: $showAgents)
             Toggle("Quota gauge", isOn: $showQuota)
-            Toggle("Auto pace (A)", isOn: $showAutoPace)
-            Toggle("API pace (P)", isOn: $showApiPace)
-            Toggle("Daily utilization (legacy)", isOn: $showDaily)
+            Toggle("Auto avg burn (A)", isOn: $showAutoPace)
+            Toggle("API avg burn (P)", isOn: $showApiPace)
+            Toggle("Daily utilization (legacy mixed)", isOn: $showDaily)
             Toggle("Overspend amount", isOn: $showOverspend)
         }
         .toggleStyle(.checkbox)
@@ -526,8 +526,8 @@ private struct MenuContentView: View {
     @ViewBuilder
     private var usageSection: some View {
         let hasBillingMeters = store.includedPercentUsed != nil
-            || store.autoPacePercent != nil
-            || store.apiPacePercent != nil
+            || store.autoDailyUtilizationPercentForDisplay != nil
+            || store.apiDailyUtilizationPercentForDisplay != nil
 
         if hasBillingMeters {
             VStack(alignment: .leading, spacing: 10) {
@@ -542,25 +542,27 @@ private struct MenuContentView: View {
                     )
                 }
 
-                if let autoPace = store.autoPacePercent {
+                if let autoPct = store.autoDailyUtilizationPercentForDisplay {
                     UsageMeterView(
-                        title: "Auto pace",
-                        percent: autoPace,
-                        color: store.autoPaceStatusColor,
-                        usedCents: store.autoUsedCreditsCents,
-                        limitCents: store.autoLimitCreditsCents,
-                        footnote: store.paceFootnote
+                        title: "Auto avg",
+                        percent: autoPct,
+                        color: store.autoDailyStatusColor,
+                        usedCents: store.autoAvgDailyCents,
+                        limitCents: store.autoDailyBudgetCents,
+                        usedLabel: "Avg/day",
+                        footnote: store.autoDailyFootnote
                     )
                 }
 
-                if let apiPace = store.apiPacePercent {
+                if let apiPct = store.apiDailyUtilizationPercentForDisplay {
                     UsageMeterView(
-                        title: "API pace",
-                        percent: apiPace,
-                        color: store.apiPaceStatusColor,
-                        usedCents: store.apiUsedCreditsCents,
-                        limitCents: store.apiLimitCreditsCents,
-                        footnote: store.paceFootnote
+                        title: "API avg",
+                        percent: apiPct,
+                        color: store.apiDailyStatusColor,
+                        usedCents: store.apiAvgDailyCents,
+                        limitCents: store.apiDailyBudgetCents,
+                        usedLabel: "Avg/day",
+                        footnote: store.apiDailyFootnote
                     )
                 }
             }

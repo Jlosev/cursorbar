@@ -33,18 +33,20 @@ public enum PaceCalculator {
         return count
     }
 
-    /// Workdays from today through cycle end (today inclusive if before end).
+    /// Future workdays after today through cycle end: `[tomorrow, cycleEnd)`.
+    /// Today is excluded so it is not double-counted with elapsed (today’s spend is already in avg burn).
     public static func remainingWorkdays(
         now: Date,
         cycleEnd: Date,
         calendar: Calendar = .current
     ) -> Int {
         let todayStart = calendar.startOfDay(for: now)
+        let tomorrow = calendar.date(byAdding: .day, value: 1, to: todayStart) ?? todayStart
         let cycleEndStart = calendar.startOfDay(for: cycleEnd)
-        return workingDays(from: todayStart, to: cycleEndStart, calendar: calendar)
+        return workingDays(from: tomorrow, to: cycleEndStart, calendar: calendar)
     }
 
-    /// Today’s allowance after redistributing unused quota across remaining workdays.
+    /// Redistributed allowance across future workdays (`remaining ÷ remainingWorkdays`).
     public static func dailyBudgetCents(remainingCents: Int, remainingWorkdays: Int) -> Int? {
         guard remainingCents >= 0 else { return nil }
         let days = max(remainingWorkdays, 1)

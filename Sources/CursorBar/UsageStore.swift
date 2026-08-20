@@ -211,7 +211,7 @@ final class UsageStore: ObservableObject {
         return PaceCalculator.workingDays(from: start, to: endExclusive, calendar: calendar)
     }
 
-    /// Workdays from today through billing cycle end (today inclusive).
+    /// Future workdays after today through billing cycle end (`[tomorrow, end)`).
     var remainingWorkingDaysInCycle: Int? {
         guard let end = billingCycleEndDate else { return nil }
         let count = PaceCalculator.remainingWorkdays(now: Date(), cycleEnd: end)

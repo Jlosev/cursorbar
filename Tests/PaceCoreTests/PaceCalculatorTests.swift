@@ -18,16 +18,14 @@ final class PaceCalculatorTests: XCTestCase {
         XCTAssertEqual(PaceCalculator.workingDays(from: start, to: end, calendar: utc), 10)
     }
 
-    func testRemainingWorkdays_includesToday_weekdaysOnly() {
+    func testRemainingWorkdays_excludesToday_startsTomorrow() {
         // Wed 2026-08-05 → cycle end Mon 2026-08-17 (exclusive end start-of-day Aug 17)
-        // Bound endExclusive = Thu Aug 6 for "elapsed" style; remaining uses today→cycleEnd
-        // remaining: Wed 5, Thu 6, Fri 7, Mon 10, Tue 11, Wed 12, Thu 13, Fri 14 = 8
-        // cycleEnd = Aug 17 00:00 → last day counted is Fri Aug 14
+        // remaining from tomorrow: Thu 6, Fri 7, Mon 10, Tue 11, Wed 12, Thu 13, Fri 14 = 7
         let now = date(2026, 8, 5)
         let cycleEnd = date(2026, 8, 17)
         XCTAssertEqual(
             PaceCalculator.remainingWorkdays(now: now, cycleEnd: cycleEnd, calendar: utc),
-            8
+            7
         )
     }
 
@@ -38,6 +36,37 @@ final class PaceCalculatorTests: XCTestCase {
             PaceCalculator.remainingWorkdays(now: now, cycleEnd: cycleEnd, calendar: utc),
             0
         )
+    }
+
+    func testRemainingWorkdays_zeroOnLastWorkday() {
+        // Friday 2026-08-14, cycle ends Mon 2026-08-17 → no future workdays before end
+        let now = date(2026, 8, 14)
+        let cycleEnd = date(2026, 8, 17)
+        XCTAssertEqual(
+            PaceCalculator.remainingWorkdays(now: now, cycleEnd: cycleEnd, calendar: utc),
+            0
+        )
+    }
+
+    func testOnPace_disjointWindows_eveningUtilizationIs100() {
+        // $400 pool, even $20/day over 20 workdays. After 10 elapsed days, used = $200.
+        // Elapsed includes today; remaining starts tomorrow → 10 future days, not 11.
+        let used = 20_000
+        let remaining = 20_000
+        let elapsed = 10
+        let remainingDays = 10
+        let avg = PaceCalculator.avgDailyCents(usedCents: used, elapsedWorkdays: elapsed)!
+        let budget = PaceCalculator.dailyBudgetCents(
+            remainingCents: remaining,
+            remainingWorkdays: remainingDays
+        )!
+        let pct = PaceCalculator.dailyUtilizationPercent(
+            avgDailyCents: avg,
+            dailyBudgetCents: budget
+        )!
+        XCTAssertEqual(avg, 2_000)
+        XCTAssertEqual(budget, 2_000)
+        XCTAssertEqual(pct, 100.0, accuracy: 0.01)
     }
 
     func testDailyBudget_redistributesRemaining() {

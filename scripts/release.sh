@@ -11,7 +11,7 @@ if [[ -z "$VERSION" ]]; then
 fi
 
 TAG="v${VERSION}"
-ZIP="$ROOT/CursorBarPace-${VERSION}.zip"
+ZIP="$ROOT/CursorBar-${VERSION}.zip"
 
 cd "$ROOT"
 
@@ -20,12 +20,12 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
     exit 1
 fi
 
-echo "Building CursorBarPace ${VERSION}..."
+echo "Building CursorBar ${VERSION}..."
 VERSION="$VERSION" bash scripts/package.sh
 
 echo "Creating ${ZIP}..."
 rm -f "$ZIP"
-ditto -c -k --sequesterRsrc --keepParent CursorBarPace.app "$ZIP"
+ditto -c -k --sequesterRsrc --keepParent CursorBar.app "$ZIP"
 shasum -a 256 "$ZIP"
 
 echo "Tagging ${TAG}..."

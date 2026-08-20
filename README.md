@@ -10,14 +10,12 @@ Personal fork of [CursorBar](https://github.com/c-johannesen/cursorbar) with nes
 - **Menu bar A/P** — daily avg burn gauges vs `remaining ÷ remaining workdays`
 - **Unused quota raises later daily budgets** (quiet days redistribute)
 - **Mixed daily utilization (`D`)** — optional legacy toggle, off by default
-- **Installs as `CursorBarPace.app`** (`com.cursorbar.pace`) — Homebrew `CursorBar` is untouched
-- **Upstream auto-update disabled** — fork does not pull `c-johannesen/cursorbar` releases
 
-### Build & install (fork)
+### Build & install
 
 ```bash
 bash scripts/package.sh --install --open
-open -a CursorBarPace
+open -a CursorBar
 ```
 
 ---

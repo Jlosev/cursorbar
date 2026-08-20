@@ -487,7 +487,7 @@ private struct MenuContentView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text("CursorBar Pace")
+                Text("CursorBar")
                     .font(.headline)
                 Spacer()
                 Text(store.planDisplayName)

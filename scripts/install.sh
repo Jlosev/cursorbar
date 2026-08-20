@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-APP_NAME="CursorBarPace"
+APP_NAME="CursorBar"
 INSTALLED_APP="/Applications/$APP_NAME.app"
 
 if ! command -v swift >/dev/null 2>&1; then

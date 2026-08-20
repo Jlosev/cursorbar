@@ -2,7 +2,7 @@
 import PackageDescription
 
 let package = Package(
-    name: "CursorBarPace",
+    name: "CursorBar",
     platforms: [.macOS(.v14)],
     targets: [
         .target(
@@ -10,7 +10,7 @@ let package = Package(
             path: "Sources/PaceCore"
         ),
         .executableTarget(
-            name: "CursorBarPace",
+            name: "CursorBar",
             dependencies: ["PaceCore"],
             path: "Sources/CursorBar",
             linkerSettings: [.linkedLibrary("sqlite3")]

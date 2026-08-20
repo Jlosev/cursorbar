@@ -42,7 +42,7 @@ ln -sfn "../../../Library/Mobile Documents/iCloud~md~obsidian/Documents/Evgeniy 
 
 - Do not commit vault contents via `docs/` (`/docs` is gitignored).
 - Redistributing daily: `daily_budget = remaining / remaining_workdays` where remaining days = `[tomorrow, cycleEnd)`; `utilization = avg_daily / daily_budget`. Defer today-$ split.
-- Prefer renaming the built app / bundle id so brew `CursorBar` is not overwritten.
+- Ship as upstream `CursorBar` / `com.cursorbar.app` (needed for a PR back to `c-johannesen/cursorbar`).
 
 ## Стек и инструменты
 

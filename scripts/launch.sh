@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_NAME="CursorBarPace"
+APP_NAME="CursorBar"
 INSTALLED_APP="/Applications/$APP_NAME.app"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 LOCAL_APP="$ROOT/$APP_NAME.app"
@@ -11,7 +11,7 @@ if [[ -d "$INSTALLED_APP" ]]; then
 elif [[ -d "$LOCAL_APP" ]]; then
     APP="$LOCAL_APP"
 else
-    echo "CursorBarPace.app not found." >&2
+    echo "CursorBar.app not found." >&2
     echo "Run: bash scripts/install.sh" >&2
     exit 1
 fi
@@ -22,9 +22,9 @@ open "$APP"
 
 sleep 1
 if pgrep -x "$APP_NAME" >/dev/null; then
-    echo "CursorBarPace is running from $APP"
+    echo "CursorBar is running from $APP"
 else
-    echo "CursorBarPace failed to start. Check setup with:" >&2
-    echo "  $APP/Contents/MacOS/CursorBarPace --status" >&2
+    echo "CursorBar failed to start. Check setup with:" >&2
+    echo "  $APP/Contents/MacOS/CursorBar --status" >&2
     exit 1
 fi

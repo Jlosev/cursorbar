@@ -43,16 +43,51 @@ final class UpdateChecker: ObservableObject {
         URL(string: "https://api.github.com/repos/c-johannesen/cursorbar/releases/latest")!
 
     init() {
-        // Fork: do not check c-johannesen/cursorbar releases (wrong app bundle).
+        Task { await checkForUpdates(announceResult: false) }
     }
 
     /// - Parameter announceResult: when true (manual check), also report "up to date" and failures.
     func checkForUpdates(announceResult: Bool) async {
+        guard !isChecking, !isUpdating else { return }
+        isChecking = true
         if announceResult {
-            statusMessage = "Updates disabled in CursorBar Pace fork."
+            statusMessage = nil
         }
-        availableUpdate = nil
-        return
+        defer { isChecking = false }
+
+        do {
+            var request = URLRequest(url: Self.latestReleaseURL)
+            request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                throw UpdateError.requestFailed
+            }
+
+            let release = try JSONDecoder().decode(GitHubRelease.self, from: data)
+            let latestVersion = release.tagName.hasPrefix("v")
+                ? String(release.tagName.dropFirst())
+                : release.tagName
+
+            guard let asset = release.assets.first(where: { $0.name.hasSuffix(".zip") }),
+                  let zipURL = URL(string: asset.browserDownloadURL)
+            else {
+                throw UpdateError.noAsset
+            }
+
+            if Self.isVersion(latestVersion, newerThan: Self.currentVersion) {
+                availableUpdate = Release(version: latestVersion, zipURL: zipURL)
+            } else {
+                availableUpdate = nil
+                if announceResult {
+                    statusMessage = "Up to date (v\(Self.currentVersion))"
+                }
+            }
+        } catch {
+            if announceResult {
+                statusMessage = "Update check failed: \(error.localizedDescription)"
+            }
+        }
     }
 
     func installUpdate() async {

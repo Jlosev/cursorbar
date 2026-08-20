@@ -1,12 +1,13 @@
 # cursorbar-pace
 
-Personal fork of [CursorBar](https://github.com/c-johannesen/cursorbar) with **Auto** and **API pace** bars in the menu bar — spend rate vs working-day fraction of the billing cycle, so API quota is not burned early.
+Personal fork of [CursorBar](https://github.com/c-johannesen/cursorbar) with **Auto** and **API daily** bars in the menu bar — avg burn vs redistributing daily budget (`remaining ÷ remaining workdays`), so API quota is not burned early.
 
-**Docs:** product hub and requirements live in Obsidian (`docs/` symlink in the main repo layout). See `CursorBar Pace – Hub.md` and `Specs/2026-08-07 – Requirements.md`.
+**Docs:** product hub and requirements live in Obsidian (`docs/` symlink in the main repo layout). See `CursorBar Pace – Hub.md` and `Specs/2026-08-20 – Redistributing daily.md`.
 
 ### Fork features
 
-- **Auto pace (`A`) and API pace (`P`)** — each pool's % used divided by elapsed/total working days in the billing cycle
+- **Auto daily (`A`) / API daily (`P`)** — avg burn vs `remaining ÷ remaining workdays`
+- **Unused quota raises later daily budgets** (quiet days redistribute)
 - **Mixed daily utilization (`D`)** — optional legacy toggle, off by default
 - **Installs as `CursorBarPace.app`** (`com.cursorbar.pace`) — Homebrew `CursorBar` is untouched
 - **Upstream auto-update disabled** — fork does not pull `c-johannesen/cursorbar` releases

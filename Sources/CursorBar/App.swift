@@ -379,9 +379,7 @@ private struct MenuContentView: View {
             Divider()
             footer
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 14)
-        .padding(.bottom, 20)
+        .padding(14)
         .frame(width: 280)
     }
 
@@ -685,12 +683,12 @@ private struct MenuContentView: View {
     }
 
     private var footer: some View {
-        HStack {
+        HStack(alignment: .center, spacing: 8) {
             Text("Updated \(store.lastUpdatedText) · v\(UpdateChecker.currentVersion)")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
-
-            Spacer()
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
                 showSettings.toggle()

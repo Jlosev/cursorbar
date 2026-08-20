@@ -588,9 +588,7 @@ private struct MenuContentView: View {
                         usedCents: store.todaySpendCents,
                         limitCents: store.dailyBudgetCents,
                         usedLabel: "Today",
-                        footnote: store.workingDaysInCycle.map {
-                            "Mixed Auto+API · budget = quota / \($0) workdays"
-                        }
+                        footnote: store.mixedDailyFootnote
                     )
                 } else {
                     Text("Daily")

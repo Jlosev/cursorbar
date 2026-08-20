@@ -314,10 +314,20 @@ final class UsageStore: ObservableObject {
         (budgetCents ?? -1) == 0 && (avgDailyCents ?? 0) > 0
     }
 
-    /// Total quota divided by working days in the billing cycle.
+    /// Included remaining redistributed across future workdays (same formula as Auto/API daily).
     var dailyBudgetCents: Int? {
-        guard let includedLimitCreditsCents, let workingDaysInCycle else { return nil }
-        return includedLimitCreditsCents / workingDaysInCycle
+        guard let remaining = includedRemainingCreditsCents,
+              let days = remainingWorkingDaysInCycle
+        else { return nil }
+        return PaceCalculator.dailyBudgetCents(remainingCents: remaining, remainingWorkdays: days)
+    }
+
+    var mixedDailyFootnote: String? {
+        dailyFootnote(
+            poolLabel: "Daily",
+            remainingCents: includedRemainingCreditsCents,
+            budgetCents: dailyBudgetCents
+        )
     }
 
     /// Today's spend as a percentage of the daily budget. Can exceed 100%.

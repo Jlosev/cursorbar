@@ -308,13 +308,15 @@ private struct UsageMeterView: View {
     var remainingCents: Int?
     var usedLabel: String = "Used"
     var footnote: String?
+    /// Nested under a parent total meter (Auto/API under Included or Daily).
+    var indented: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
                 Text(title)
                     .font(.caption.weight(.medium))
-                    .frame(width: 96, alignment: .leading)
+                    .frame(width: 108, alignment: .leading)
                     .lineLimit(1)
 
                 ProgressView(value: min(max(percent / 100.0, 0), 1))
@@ -341,6 +343,7 @@ private struct UsageMeterView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .padding(.leading, indented ? 12 : 0)
     }
 
     private var detailText: String? {
@@ -406,9 +409,9 @@ private struct MenuContentView: View {
 
             Toggle("Agents badge", isOn: $showAgents)
             Toggle("Quota gauge", isOn: $showQuota)
-            Toggle("Auto avg burn (A)", isOn: $showAutoPace)
-            Toggle("API avg burn (P)", isOn: $showApiPace)
-            Toggle("Daily utilization (legacy mixed)", isOn: $showDaily)
+            Toggle("Auto daily (A)", isOn: $showAutoPace)
+            Toggle("API daily (P)", isOn: $showApiPace)
+            Toggle("Daily total (mixed)", isOn: $showDaily)
             Toggle("Overspend amount", isOn: $showOverspend)
         }
         .toggleStyle(.checkbox)
@@ -525,12 +528,15 @@ private struct MenuContentView: View {
 
     @ViewBuilder
     private var usageSection: some View {
-        let hasBillingMeters = store.includedPercentUsed != nil
+        let hasIncludedBlock = store.includedPercentUsed != nil
+            || store.autoPercentUsed != nil
+            || store.apiPercentUsed != nil
+        let hasDailyBlock = store.dailyUtilizationPercent != nil
             || store.autoDailyUtilizationPercentForDisplay != nil
             || store.apiDailyUtilizationPercentForDisplay != nil
 
-        if hasBillingMeters {
-            VStack(alignment: .leading, spacing: 10) {
+        if hasIncludedBlock {
+            VStack(alignment: .leading, spacing: 8) {
                 if let percentUsed = store.includedPercentUsed {
                     UsageMeterView(
                         title: "Included usage",
@@ -542,46 +548,81 @@ private struct MenuContentView: View {
                     )
                 }
 
-                if let autoPct = store.autoDailyUtilizationPercentForDisplay {
+                if let autoPct = store.autoPercentUsed {
                     UsageMeterView(
-                        title: "Auto avg",
+                        title: "Auto",
                         percent: autoPct,
-                        color: store.autoDailyStatusColor,
-                        usedCents: store.autoAvgDailyCents,
-                        limitCents: store.autoDailyBudgetCents,
-                        usedLabel: "Avg/day",
-                        footnote: store.autoDailyFootnote
+                        color: store.autoStatusColor,
+                        usedCents: store.autoUsedCreditsCents,
+                        limitCents: store.autoLimitCreditsCents,
+                        remainingCents: store.autoRemainingCreditsCents,
+                        indented: true
                     )
                 }
 
-                if let apiPct = store.apiDailyUtilizationPercentForDisplay {
+                if let apiPct = store.apiPercentUsed {
                     UsageMeterView(
-                        title: "API avg",
+                        title: "API",
                         percent: apiPct,
-                        color: store.apiDailyStatusColor,
-                        usedCents: store.apiAvgDailyCents,
-                        limitCents: store.apiDailyBudgetCents,
-                        usedLabel: "Avg/day",
-                        footnote: store.apiDailyFootnote
+                        color: store.apiStatusColor,
+                        usedCents: store.apiUsedCreditsCents,
+                        limitCents: store.apiLimitCreditsCents,
+                        remainingCents: store.apiRemainingCreditsCents,
+                        indented: true
                     )
                 }
             }
         }
 
-        if hasBillingMeters, store.dailyUtilizationPercent != nil {
+        if hasIncludedBlock, hasDailyBlock {
             Divider()
         }
 
-        if let dailyPercent = store.dailyUtilizationPercent {
-            UsageMeterView(
-                title: "Daily (legacy/total)",
-                percent: dailyPercent,
-                color: store.dailyStatusColor,
-                usedCents: store.todaySpendCents,
-                limitCents: store.dailyBudgetCents,
-                usedLabel: "Today",
-                footnote: store.workingDaysInCycle.map { "Mixed Auto+API · budget = quota / \($0) workdays" }
-            )
+        if hasDailyBlock {
+            VStack(alignment: .leading, spacing: 8) {
+                if let dailyPercent = store.dailyUtilizationPercent {
+                    UsageMeterView(
+                        title: "Daily",
+                        percent: dailyPercent,
+                        color: store.dailyStatusColor,
+                        usedCents: store.todaySpendCents,
+                        limitCents: store.dailyBudgetCents,
+                        usedLabel: "Today",
+                        footnote: store.workingDaysInCycle.map {
+                            "Mixed Auto+API · budget = quota / \($0) workdays"
+                        }
+                    )
+                } else {
+                    Text("Daily")
+                        .font(.caption.weight(.medium))
+                }
+
+                if let autoPct = store.autoDailyUtilizationPercentForDisplay {
+                    UsageMeterView(
+                        title: "Auto daily",
+                        percent: autoPct,
+                        color: store.autoDailyStatusColor,
+                        usedCents: store.autoAvgDailyCents,
+                        limitCents: store.autoDailyBudgetCents,
+                        usedLabel: "Avg/day",
+                        footnote: store.autoDailyFootnote,
+                        indented: true
+                    )
+                }
+
+                if let apiPct = store.apiDailyUtilizationPercentForDisplay {
+                    UsageMeterView(
+                        title: "API daily",
+                        percent: apiPct,
+                        color: store.apiDailyStatusColor,
+                        usedCents: store.apiAvgDailyCents,
+                        limitCents: store.apiDailyBudgetCents,
+                        usedLabel: "Avg/day",
+                        footnote: store.apiDailyFootnote,
+                        indented: true
+                    )
+                }
+            }
         }
 
         if store.hasOverspend {

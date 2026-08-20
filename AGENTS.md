@@ -15,7 +15,7 @@ updated: 2026-08-20
 **CRITICAL:** Code lives in this repo (`~/Documents/03_Projects/cursorbar-pace`); never treat Obsidian vault checkout as the code root.
 **CRITICAL:** Product name is `cursorbar-pace` (fork of CursorBar). Soft-diverge from upstream `c-johannesen/cursorbar` (MIT).
 **MANDATORY:** Durable product/requirements truth → `@docs/` (symlink into vault).
-**MANDATORY:** Active spec = **Auto/API daily** (avg burn vs redistributing daily budget) from `usage-summary` only – see `@docs/Specs/2026-08-20 – Redistributing daily.md`. No event/model heuristic.
+**MANDATORY:** Active spec = nested dropdown (Included = Auto/API **monthly pool %**; Daily = Auto/API **avg burn**) + menu bar A/P = daily — `@docs/Specs/2026-08-20 – Redistributing daily.md`. No event/model heuristic.
 **MANDATORY:** Remote for upstream is `upstream` (not `origin` until a personal fork remote is added).
 
 ---

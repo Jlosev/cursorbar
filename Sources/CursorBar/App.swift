@@ -305,18 +305,15 @@ private struct UsageMeterView: View {
     let color: Color
     var usedCents: Int?
     var limitCents: Int?
-    var remainingCents: Int?
-    var usedLabel: String = "Used"
-    var footnote: String?
     /// Nested under a parent total meter (Auto/API under Included or Daily).
     var indented: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 8) {
                 Text(title)
                     .font(.caption.weight(.medium))
-                    .frame(width: 108, alignment: .leading)
+                    .frame(width: 96, alignment: .leading)
                     .lineLimit(1)
 
                 ProgressView(value: min(max(percent / 100.0, 0), 1))
@@ -330,30 +327,14 @@ private struct UsageMeterView: View {
                     .frame(width: 30, alignment: .trailing)
             }
 
-            if let detailText = detailText {
-                Text(detailText)
+            if let usedCents, let limitCents {
+                Text("\(UsageStore.formatDollars(cents: usedCents)) / \(UsageStore.formatDollars(cents: limitCents))")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .monospacedDigit()
             }
-
-            if let footnote {
-                Text(footnote)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
         }
         .padding(.leading, indented ? 12 : 0)
-    }
-
-    private var detailText: String? {
-        guard let usedCents, let limitCents else { return nil }
-
-        var text = "\(usedLabel) \(UsageStore.formatDollars(cents: usedCents)) / \(UsageStore.formatDollars(cents: limitCents))"
-        if let remainingCents {
-            text += " · \(UsageStore.formatDollars(cents: remainingCents)) left"
-        }
-        return text
     }
 }
 
@@ -370,7 +351,7 @@ private struct MenuContentView: View {
     @AppStorage(MenuBarPrefs.showAgentsKey) private var showAgents = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             header
             Divider()
 
@@ -398,7 +379,9 @@ private struct MenuContentView: View {
             Divider()
             footer
         }
-        .padding(14)
+        .padding(.horizontal, 14)
+        .padding(.top, 14)
+        .padding(.bottom, 20)
         .frame(width: 280)
     }
 
@@ -536,15 +519,14 @@ private struct MenuContentView: View {
             || store.apiDailyUtilizationPercentForDisplay != nil
 
         if hasIncludedBlock {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 if let percentUsed = store.includedPercentUsed {
                     UsageMeterView(
                         title: "Included usage",
                         percent: percentUsed,
                         color: store.statusColor,
                         usedCents: store.includedUsedCreditsCents,
-                        limitCents: store.includedLimitCreditsCents,
-                        remainingCents: store.includedRemainingCreditsCents
+                        limitCents: store.includedLimitCreditsCents
                     )
                 }
 
@@ -555,7 +537,6 @@ private struct MenuContentView: View {
                         color: store.autoStatusColor,
                         usedCents: store.autoUsedCreditsCents,
                         limitCents: store.autoLimitCreditsCents,
-                        remainingCents: store.autoRemainingCreditsCents,
                         indented: true
                     )
                 }
@@ -567,7 +548,6 @@ private struct MenuContentView: View {
                         color: store.apiStatusColor,
                         usedCents: store.apiUsedCreditsCents,
                         limitCents: store.apiLimitCreditsCents,
-                        remainingCents: store.apiRemainingCreditsCents,
                         indented: true
                     )
                 }
@@ -579,16 +559,14 @@ private struct MenuContentView: View {
         }
 
         if hasDailyBlock {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 if let dailyPercent = store.dailyUtilizationPercent {
                     UsageMeterView(
                         title: "Daily",
                         percent: dailyPercent,
                         color: store.dailyStatusColor,
                         usedCents: store.todaySpendCents,
-                        limitCents: store.dailyBudgetCents,
-                        usedLabel: "Today",
-                        footnote: store.mixedDailyFootnote
+                        limitCents: store.dailyBudgetCents
                     )
                 } else {
                     Text("Daily")
@@ -602,8 +580,6 @@ private struct MenuContentView: View {
                         color: store.autoDailyStatusColor,
                         usedCents: store.autoAvgDailyCents,
                         limitCents: store.autoDailyBudgetCents,
-                        usedLabel: "Avg/day",
-                        footnote: store.autoDailyFootnote,
                         indented: true
                     )
                 }
@@ -615,8 +591,6 @@ private struct MenuContentView: View {
                         color: store.apiDailyStatusColor,
                         usedCents: store.apiAvgDailyCents,
                         limitCents: store.apiDailyBudgetCents,
-                        usedLabel: "Avg/day",
-                        footnote: store.apiDailyFootnote,
                         indented: true
                     )
                 }

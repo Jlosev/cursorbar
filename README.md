@@ -27,7 +27,7 @@ A lightweight macOS menu bar app that shows your Cursor plan usage and how much 
 
 No browser tab, no manual cookie paste — CursorBar reads your session from the local Cursor IDE database and fetches usage from Cursor's dashboard API.
 
-![CursorBar dropdown showing agent status, needs-input alerts, usage breakdown by category, daily utilization, and billing cycle](docs/screenshot.png)
+![CursorBar dropdown showing agent status, needs-input alerts, usage breakdown by category, daily utilization, and billing cycle](assets/screenshot.png)
 
 ## Features
 

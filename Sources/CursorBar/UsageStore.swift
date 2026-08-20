@@ -258,13 +258,13 @@ final class UsageStore: ObservableObject {
 
     var apiDailyUtilizationPercentForDisplay: Double? {
         if let pct = apiDailyUtilizationPercent { return pct }
-        if (apiDailyBudgetCents ?? -1) == 0, (apiAvgDailyCents ?? 0) > 0 { return 100 }
+        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, avgDailyCents: apiAvgDailyCents) { return 100 }
         return nil
     }
 
     var autoDailyUtilizationPercentForDisplay: Double? {
         if let pct = autoDailyUtilizationPercent { return pct }
-        if (autoDailyBudgetCents ?? -1) == 0, (autoAvgDailyCents ?? 0) > 0 { return 100 }
+        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, avgDailyCents: autoAvgDailyCents) { return 100 }
         return nil
     }
 
@@ -277,12 +277,12 @@ final class UsageStore: ObservableObject {
     }
 
     var autoDailyStatusColor: Color {
-        if (autoDailyBudgetCents ?? -1) == 0, (autoAvgDailyCents ?? 0) > 0 { return .red }
+        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, avgDailyCents: autoAvgDailyCents) { return .red }
         return Self.poolDailyStatusColor(for: autoDailyUtilizationPercent)
     }
 
     var apiDailyStatusColor: Color {
-        if (apiDailyBudgetCents ?? -1) == 0, (apiAvgDailyCents ?? 0) > 0 { return .red }
+        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, avgDailyCents: apiAvgDailyCents) { return .red }
         return Self.poolDailyStatusColor(for: apiDailyUtilizationPercent)
     }
 
@@ -297,17 +297,21 @@ final class UsageStore: ObservableObject {
     }
 
     var autoDailyFootnote: String? {
-        if (autoDailyBudgetCents ?? -1) == 0, (autoAvgDailyCents ?? 0) > 0 {
+        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, avgDailyCents: autoAvgDailyCents) {
             return "$0/day left · pool exhausted"
         }
         return dailyFootnote(poolLabel: "Auto", remainingCents: autoRemainingCreditsCents, budgetCents: autoDailyBudgetCents)
     }
 
     var apiDailyFootnote: String? {
-        if (apiDailyBudgetCents ?? -1) == 0, (apiAvgDailyCents ?? 0) > 0 {
+        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, avgDailyCents: apiAvgDailyCents) {
             return "$0/day left · pool exhausted"
         }
         return dailyFootnote(poolLabel: "API", remainingCents: apiRemainingCreditsCents, budgetCents: apiDailyBudgetCents)
+    }
+
+    private static func isDepletedPoolWithBurn(budgetCents: Int?, avgDailyCents: Int?) -> Bool {
+        (budgetCents ?? -1) == 0 && (avgDailyCents ?? 0) > 0
     }
 
     /// Total quota divided by working days in the billing cycle.

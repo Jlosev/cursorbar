@@ -1,7 +1,7 @@
 import Foundation
 
 public enum PaceCalculator {
-    /// End bound so “today” counts as an elapsed workday when used with `workingDays`.
+    /// End bound so “today” counts when used as `workingDays` endExclusive from cycle start.
     public static func elapsedEndExclusive(
         now: Date,
         cycleEnd: Date,
@@ -33,16 +33,34 @@ public enum PaceCalculator {
         return count
     }
 
-    /// Pace index: `100` = usage matches elapsed fraction of cycle workdays.
-    /// Uses `max(elapsedWorkdays, 1)` so early-cycle / weekend start does not divide by zero.
-    public static func pacePercent(
-        poolPercentUsed: Double,
-        elapsedWorkdays: Int,
-        totalWorkdays: Int
-    ) -> Double? {
-        guard totalWorkdays > 0 else { return nil }
-        let elapsed = max(elapsedWorkdays, 1)
-        let fraction = Double(elapsed) / Double(totalWorkdays)
-        return poolPercentUsed / fraction
+    /// Workdays from today through cycle end (today inclusive if before end).
+    public static func remainingWorkdays(
+        now: Date,
+        cycleEnd: Date,
+        calendar: Calendar = .current
+    ) -> Int {
+        let todayStart = calendar.startOfDay(for: now)
+        let cycleEndStart = calendar.startOfDay(for: cycleEnd)
+        return workingDays(from: todayStart, to: cycleEndStart, calendar: calendar)
+    }
+
+    /// Today’s allowance after redistributing unused quota across remaining workdays.
+    public static func dailyBudgetCents(remainingCents: Int, remainingWorkdays: Int) -> Int? {
+        guard remainingCents >= 0 else { return nil }
+        let days = max(remainingWorkdays, 1)
+        return remainingCents / days  // may be 0 when remaining is 0
+    }
+
+    /// Mean burn per elapsed workday so far.
+    public static func avgDailyCents(usedCents: Int, elapsedWorkdays: Int) -> Int? {
+        guard usedCents >= 0 else { return nil }
+        let days = max(elapsedWorkdays, 1)
+        return usedCents / days
+    }
+
+    /// Avg burn vs today’s redistributed budget. 100 = on track for remaining days.
+    public static func dailyUtilizationPercent(avgDailyCents: Int, dailyBudgetCents: Int) -> Double? {
+        guard dailyBudgetCents > 0 else { return nil }
+        return Double(avgDailyCents) / Double(dailyBudgetCents) * 100.0
     }
 }

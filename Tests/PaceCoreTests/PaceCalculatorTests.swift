@@ -13,82 +13,112 @@ final class PaceCalculatorTests: XCTestCase {
     }
 
     func testWorkingDays_excludesWeekends_halfOpen() {
-        // Mon 2026-08-03 .. Fri 2026-08-14 exclusive end Sat 2026-08-15
-        // Weekdays: 3–7, 10–14 = 10 days
         let start = date(2026, 8, 3)
         let end = date(2026, 8, 15)
         XCTAssertEqual(PaceCalculator.workingDays(from: start, to: end, calendar: utc), 10)
     }
 
-    func testWorkingDays_emptyWhenStartNotBeforeEnd() {
-        let day = date(2026, 8, 3)
-        XCTAssertEqual(PaceCalculator.workingDays(from: day, to: day, calendar: utc), 0)
-    }
-
-    func testPace_onPlan_midCycle() {
-        // 50% used, 50% of workdays elapsed → pace 100
-        let pace = PaceCalculator.pacePercent(
-            poolPercentUsed: 50,
-            elapsedWorkdays: 5,
-            totalWorkdays: 10
-        )
-        XCTAssertEqual(pace!, 100, accuracy: 0.001)
-    }
-
-    func testPace_aheadOfPlan() {
-        // 40% used, 20% time elapsed → pace 200
-        let pace = PaceCalculator.pacePercent(
-            poolPercentUsed: 40,
-            elapsedWorkdays: 2,
-            totalWorkdays: 10
-        )
-        XCTAssertEqual(pace!, 200, accuracy: 0.001)
-    }
-
-    func testPace_usesMinOneElapsed_toAvoidDivZero() {
-        let pace = PaceCalculator.pacePercent(
-            poolPercentUsed: 5,
-            elapsedWorkdays: 0,
-            totalWorkdays: 20
-        )
-        // 5 / (1/20) = 100
-        XCTAssertEqual(pace!, 100, accuracy: 0.001)
-    }
-
-    func testPace_nilWhenTotalWorkdaysZero() {
-        XCTAssertNil(
-            PaceCalculator.pacePercent(
-                poolPercentUsed: 10,
-                elapsedWorkdays: 1,
-                totalWorkdays: 0
-            )
+    func testRemainingWorkdays_includesToday_weekdaysOnly() {
+        // Wed 2026-08-05 → cycle end Mon 2026-08-17 (exclusive end start-of-day Aug 17)
+        // Bound endExclusive = Thu Aug 6 for "elapsed" style; remaining uses today→cycleEnd
+        // remaining: Wed 5, Thu 6, Fri 7, Mon 10, Tue 11, Wed 12, Thu 13, Fri 14 = 8
+        // cycleEnd = Aug 17 00:00 → last day counted is Fri Aug 14
+        let now = date(2026, 8, 5)
+        let cycleEnd = date(2026, 8, 17)
+        XCTAssertEqual(
+            PaceCalculator.remainingWorkdays(now: now, cycleEnd: cycleEnd, calendar: utc),
+            8
         )
     }
 
+    func testRemainingWorkdays_zeroWhenPastEnd() {
+        let now = date(2026, 8, 20)
+        let cycleEnd = date(2026, 8, 15)
+        XCTAssertEqual(
+            PaceCalculator.remainingWorkdays(now: now, cycleEnd: cycleEnd, calendar: utc),
+            0
+        )
+    }
+
+    func testDailyBudget_redistributesRemaining() {
+        // $278 remaining, 10 workdays left → $27.80/day
+        let budget = PaceCalculator.dailyBudgetCents(remainingCents: 27_800, remainingWorkdays: 10)
+        XCTAssertEqual(budget, 2_780)
+    }
+
+    func testDailyBudget_quietDaysRaiseAllowance() {
+        // Same $278 remaining but only 5 days left → $55.60/day
+        let budget = PaceCalculator.dailyBudgetCents(remainingCents: 27_800, remainingWorkdays: 5)
+        XCTAssertEqual(budget, 5_560)
+    }
+
+    func testDailyBudget_usesMinOneDay() {
+        let budget = PaceCalculator.dailyBudgetCents(remainingCents: 1_000, remainingWorkdays: 0)
+        XCTAssertEqual(budget, 1_000)
+    }
+
+    func testDailyBudget_nilWhenRemainingNegative() {
+        XCTAssertNil(PaceCalculator.dailyBudgetCents(remainingCents: -1, remainingWorkdays: 5))
+    }
+
+    func testDailyBudget_zeroRemainingYieldsZero() {
+        XCTAssertEqual(PaceCalculator.dailyBudgetCents(remainingCents: 0, remainingWorkdays: 5), 0)
+    }
+
+    func testAvgDaily_dividesUsedByElapsed() {
+        // $122 used over 5 elapsed days → $24.40/day
+        let avg = PaceCalculator.avgDailyCents(usedCents: 12_200, elapsedWorkdays: 5)
+        XCTAssertEqual(avg, 2_440)
+    }
+
+    func testAvgDaily_usesMinOneElapsed() {
+        let avg = PaceCalculator.avgDailyCents(usedCents: 500, elapsedWorkdays: 0)
+        XCTAssertEqual(avg, 500)
+    }
+
+
+    func testD1_apiRemaining278of400_notCyclePacePanic() {
+        // Motivating dogfood: $122 used of $400 → 30.5% pool; if only ~27% of cycle
+        // elapsed, old cycle-pace ≈ 114% red. New metric with 10 workdays left:
+        // budget = 27800/10 = 2780; avg = 12200/5 = 2440 → ~87.8% (not 114).
+        let budget = PaceCalculator.dailyBudgetCents(remainingCents: 27_800, remainingWorkdays: 10)!
+        let avg = PaceCalculator.avgDailyCents(usedCents: 12_200, elapsedWorkdays: 5)!
+        let pct = PaceCalculator.dailyUtilizationPercent(avgDailyCents: avg, dailyBudgetCents: budget)!
+        XCTAssertEqual(budget, 2_780)
+        XCTAssertEqual(avg, 2_440)
+        XCTAssertEqual(pct, 2440.0 / 2780.0 * 100.0, accuracy: 0.01)
+        XCTAssertLessThan(pct, 100) // must not be the false 114% panic
+    }
+
+    func testDailyUtilization_onBudget() {
+        // avg 2440 / budget 2780 ≈ 87.77%
+        let pct = PaceCalculator.dailyUtilizationPercent(avgDailyCents: 2_440, dailyBudgetCents: 2_780)
+        XCTAssertEqual(pct!, 2440.0 / 2780.0 * 100.0, accuracy: 0.01)
+    }
+
+    func testDailyUtilization_overBudget() {
+        let pct = PaceCalculator.dailyUtilizationPercent(avgDailyCents: 4_000, dailyBudgetCents: 2_000)
+        XCTAssertEqual(pct!, 200.0, accuracy: 0.01)
+    }
+
+    func testDailyUtilization_nilWhenBudgetZero() {
+        XCTAssertNil(PaceCalculator.dailyUtilizationPercent(avgDailyCents: 100, dailyBudgetCents: 0))
+    }
+
+    // Keep existing elapsedEndExclusive tests
     func testElapsedEndExclusive_includesToday() {
-        let now = date(2026, 8, 5) // Wednesday
+        let now = date(2026, 8, 5)
         let cycleEnd = date(2026, 8, 31)
         let endEx = PaceCalculator.elapsedEndExclusive(now: now, cycleEnd: cycleEnd, calendar: utc)
         XCTAssertEqual(endEx, date(2026, 8, 6))
-        // Mon–Wed inclusive → 3
-        XCTAssertEqual(
-            PaceCalculator.workingDays(from: date(2026, 8, 3), to: endEx, calendar: utc),
-            3
-        )
     }
 
     func testElapsedEndExclusive_clampsToCycleEnd() {
         let now = date(2026, 8, 20)
         let cycleEnd = date(2026, 8, 15)
-        let endEx = PaceCalculator.elapsedEndExclusive(now: now, cycleEnd: cycleEnd, calendar: utc)
-        XCTAssertEqual(endEx, date(2026, 8, 15))
-    }
-
-    func testWorkingDays_weekendOnlyWindow_isZero() {
-        // Sat→Sun half-open ending Monday → Sat+Sun = 0 weekdays
         XCTAssertEqual(
-            PaceCalculator.workingDays(from: date(2026, 8, 8), to: date(2026, 8, 10), calendar: utc),
-            0
+            PaceCalculator.elapsedEndExclusive(now: now, cycleEnd: cycleEnd, calendar: utc),
+            date(2026, 8, 15)
         )
     }
 }

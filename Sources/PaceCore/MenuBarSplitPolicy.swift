@@ -6,11 +6,18 @@ public enum MenuBarSplitPolicy {
         public var showDaily: Bool
         public var showAuto: Bool
         public var showApi: Bool
+        public var autoSplitEnabled: Bool
 
-        public init(showDaily: Bool, showAuto: Bool, showApi: Bool) {
+        public init(
+            showDaily: Bool,
+            showAuto: Bool,
+            showApi: Bool,
+            autoSplitEnabled: Bool = true
+        ) {
             self.showDaily = showDaily
             self.showAuto = showAuto
             self.showApi = showApi
+            self.autoSplitEnabled = autoSplitEnabled
         }
     }
 
@@ -39,7 +46,9 @@ public enum MenuBarSplitPolicy {
         autoIsWarning: Bool,
         apiIsWarning: Bool
     ) -> Effective {
-        let shouldOverride = prefs.showDaily && (autoIsWarning || apiIsWarning)
+        let shouldOverride = prefs.autoSplitEnabled
+            && prefs.showDaily
+            && (autoIsWarning || apiIsWarning)
         return Effective(
             showDaily: prefs.showDaily && !shouldOverride,
             showAuto: prefs.showAuto || shouldOverride,

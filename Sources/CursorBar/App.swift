@@ -76,6 +76,7 @@ enum MenuBarPrefs {
     static let showAutoPaceKey = "menuBarShowAutoPace"
     static let showApiPaceKey = "menuBarShowApiPace"
     static let showDailyKey = "menuBarShowDaily"
+    static let autoSplitDailyKey = "menuBarAutoSplitDaily"
     static let showOverspendKey = "menuBarShowOverspend"
     static let showAgentsKey = "menuBarShowAgents"
 }
@@ -85,13 +86,15 @@ private func menuBarSplit(
     store: UsageStore,
     showDaily: Bool,
     showAuto: Bool,
-    showApi: Bool
+    showApi: Bool,
+    autoSplitEnabled: Bool
 ) -> MenuBarSplitPolicy.Effective {
     MenuBarSplitPolicy.effectiveVisibility(
         prefs: MenuBarSplitPolicy.Prefs(
             showDaily: showDaily,
             showAuto: showAuto,
-            showApi: showApi
+            showApi: showApi,
+            autoSplitEnabled: autoSplitEnabled
         ),
         autoIsWarning: store.autoDailyIsWarning,
         apiIsWarning: store.apiDailyIsWarning
@@ -105,6 +108,7 @@ private struct MenuBarLabel: View {
     @AppStorage(MenuBarPrefs.showAutoPaceKey) private var showAutoPace = false
     @AppStorage(MenuBarPrefs.showApiPaceKey) private var showApiPace = false
     @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = true
+    @AppStorage(MenuBarPrefs.autoSplitDailyKey) private var autoSplitDaily = true
     @AppStorage(MenuBarPrefs.showOverspendKey) private var showOverspend = true
     @AppStorage(MenuBarPrefs.showAgentsKey) private var showAgents = true
 
@@ -127,7 +131,8 @@ private struct MenuBarLabel: View {
             store: store,
             showDaily: showDaily,
             showAuto: showAutoPace,
-            showApi: showApiPace
+            showApi: showApiPace,
+            autoSplitEnabled: autoSplitDaily
         )
     }
 
@@ -378,6 +383,7 @@ private struct MenuContentView: View {
     @AppStorage(MenuBarPrefs.showAutoPaceKey) private var showAutoPace = false
     @AppStorage(MenuBarPrefs.showApiPaceKey) private var showApiPace = false
     @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = true
+    @AppStorage(MenuBarPrefs.autoSplitDailyKey) private var autoSplitDaily = true
     @AppStorage(MenuBarPrefs.showOverspendKey) private var showOverspend = true
     @AppStorage(MenuBarPrefs.showAgentsKey) private var showAgents = true
 
@@ -419,7 +425,8 @@ private struct MenuContentView: View {
             store: store,
             showDaily: showDaily,
             showAuto: showAutoPace,
-            showApi: showApiPace
+            showApi: showApiPace,
+            autoSplitEnabled: autoSplitDaily
         )
     }
 
@@ -433,6 +440,7 @@ private struct MenuContentView: View {
             Toggle("Auto daily (A)", isOn: $showAutoPace)
             Toggle("API daily (P)", isOn: $showApiPace)
             Toggle("Daily total (mixed)", isOn: $showDaily)
+            Toggle("Auto-split Daily on A/P warning", isOn: $autoSplitDaily)
             Toggle("Overspend amount", isOn: $showOverspend)
 
             if split.isOverride {

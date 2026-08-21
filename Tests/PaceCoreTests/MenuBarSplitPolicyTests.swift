@@ -138,4 +138,57 @@ final class MenuBarSplitPolicyTests: XCTestCase {
         XCTAssertFalse(vis.showAuto)
         XCTAssertFalse(vis.showApi)
     }
+
+    func testDisabledAutoSplitKeepsDailyWhenApiWarns() {
+        let vis = MenuBarSplitPolicy.effectiveVisibility(
+            prefs: MenuBarSplitPolicy.Prefs(
+                showDaily: true,
+                showAuto: false,
+                showApi: false,
+                autoSplitEnabled: false
+            ),
+            autoIsWarning: false,
+            apiIsWarning: true
+        )
+        XCTAssertEqual(vis, MenuBarSplitPolicy.Effective(
+            showDaily: true,
+            showAuto: false,
+            showApi: false,
+            isOverride: false
+        ))
+    }
+
+    func testDisabledAutoSplitKeepsDailyWhenAutoWarns() {
+        let vis = MenuBarSplitPolicy.effectiveVisibility(
+            prefs: MenuBarSplitPolicy.Prefs(
+                showDaily: true,
+                showAuto: false,
+                showApi: false,
+                autoSplitEnabled: false
+            ),
+            autoIsWarning: true,
+            apiIsWarning: false
+        )
+        XCTAssertFalse(vis.isOverride)
+        XCTAssertTrue(vis.showDaily)
+        XCTAssertFalse(vis.showAuto)
+        XCTAssertFalse(vis.showApi)
+    }
+
+    func testEnabledAutoSplitStillSplitsWhenApiWarns() {
+        let vis = MenuBarSplitPolicy.effectiveVisibility(
+            prefs: MenuBarSplitPolicy.Prefs(
+                showDaily: true,
+                showAuto: false,
+                showApi: false,
+                autoSplitEnabled: true
+            ),
+            autoIsWarning: false,
+            apiIsWarning: true
+        )
+        XCTAssertTrue(vis.isOverride)
+        XCTAssertFalse(vis.showDaily)
+        XCTAssertTrue(vis.showAuto)
+        XCTAssertTrue(vis.showApi)
+    }
 }

@@ -1,4 +1,5 @@
 import Foundation
+import PaceCore
 
 enum CursorAPIError: Error, LocalizedError {
     case notAuthenticated
@@ -18,41 +19,60 @@ enum CursorAPIError: Error, LocalizedError {
 }
 
 struct UsageBreakdown: Decodable, Sendable {
-    let included: Int
-    let bonus: Int
-    let total: Int
+    let included: Int?
+    let bonus: Int?
+    let total: Int?
 }
 
 struct PlanUsage: Decodable, Sendable {
-    let enabled: Bool
-    let used: Int
-    let limit: Int
-    let remaining: Int
-    let breakdown: UsageBreakdown
-    let autoPercentUsed: Double
-    let apiPercentUsed: Double
-    let totalPercentUsed: Double
+    let enabled: Bool?
+    let used: Int?
+    let limit: Int?
+    let remaining: Int?
+    let breakdown: UsageBreakdown?
+    let autoPercentUsed: Double?
+    let apiPercentUsed: Double?
+    let totalPercentUsed: Double?
 }
 
 struct OnDemandUsage: Decodable, Sendable {
-    let enabled: Bool
-    let used: Int
+    let enabled: Bool?
+    let used: Int?
+    let limit: Int?
+    let remaining: Int?
+
+    var isEnabled: Bool { enabled ?? false }
+    var usedCents: Int { used ?? 0 }
+}
+
+/// Spend on token-based Enterprise contracts that omit `plan`.
+struct OverallUsage: Decodable, Sendable {
+    let enabled: Bool?
+    let used: Int?
     let limit: Int?
     let remaining: Int?
 }
 
 struct IndividualUsage: Decodable, Sendable {
-    let plan: PlanUsage
-    let onDemand: OnDemandUsage
+    let plan: PlanUsage?
+    let onDemand: OnDemandUsage?
+    let overall: OverallUsage?
+}
+
+struct TeamUsage: Decodable, Sendable {
+    let onDemand: OnDemandUsage?
 }
 
 struct UsageSummary: Decodable, Sendable {
-    let billingCycleStart: String
-    let billingCycleEnd: String
-    let membershipType: String
-    let limitType: String
-    let isUnlimited: Bool
-    let individualUsage: IndividualUsage
+    let billingCycleStart: String?
+    let billingCycleEnd: String?
+    let membershipType: String?
+    let limitType: String?
+    let isUnlimited: Bool?
+    let autoModelSelectedDisplayMessage: String?
+    let namedModelSelectedDisplayMessage: String?
+    let individualUsage: IndividualUsage?
+    let teamUsage: TeamUsage?
 }
 
 struct UsageEventsPage: Decodable, Sendable {
@@ -61,6 +81,7 @@ struct UsageEventsPage: Decodable, Sendable {
 }
 
 struct UsageEvent: Decodable, Sendable {
+    let model: String?
     let chargedCents: Double?
     let tokenUsage: TokenUsage?
 
@@ -71,6 +92,12 @@ struct UsageEvent: Decodable, Sendable {
     var costCents: Double {
         chargedCents ?? tokenUsage?.totalCents ?? 0
     }
+}
+
+struct TodaySpend: Sendable, Equatable {
+    var totalCents: Int
+    var autoCents: Int
+    var apiCents: Int
 }
 
 enum CursorAPI {
@@ -88,26 +115,27 @@ enum CursorAPI {
         }
     }
 
-    /// Sums the cost of all usage events since local midnight, in cents.
-    static func fetchTodaySpendCents() async throws -> Int {
+    /// Sums usage events since local midnight, split Auto vs API by model.
+    static func fetchTodaySpend() async throws -> TodaySpend {
         var credentials = try TokenProvider.loadSessionCredentials()
 
         do {
-            return try await requestTodaySpendCents(credentials: credentials)
+            return try await requestTodaySpend(credentials: credentials)
         } catch CursorAPIError.notAuthenticated {
             credentials = try TokenProvider.loadSessionCredentials()
-            return try await requestTodaySpendCents(credentials: credentials)
+            return try await requestTodaySpend(credentials: credentials)
         }
     }
 
-    private static func requestTodaySpendCents(credentials: SessionCredentials) async throws -> Int {
+    private static func requestTodaySpend(credentials: SessionCredentials) async throws -> TodaySpend {
         let startOfDay = Calendar.current.startOfDay(for: Date())
         let startMs = String(Int(startOfDay.timeIntervalSince1970 * 1000))
         let endMs = String(Int(Date().timeIntervalSince1970 * 1000))
 
         let pageSize = 100
         let maxPages = 10
-        var totalCents = 0.0
+        var autoCents = 0.0
+        var apiCents = 0.0
         var page = 1
 
         while page <= maxPages {
@@ -118,7 +146,14 @@ enum CursorAPI {
                 page: page,
                 pageSize: pageSize
             )
-            totalCents += result.usageEventsDisplay.reduce(0) { $0 + $1.costCents }
+            for event in result.usageEventsDisplay {
+                switch UsagePoolClassifier.pool(forModel: event.model) {
+                case .auto:
+                    autoCents += event.costCents
+                case .api:
+                    apiCents += event.costCents
+                }
+            }
 
             if page * pageSize >= result.totalUsageEventsCount || result.usageEventsDisplay.isEmpty {
                 break
@@ -126,7 +161,9 @@ enum CursorAPI {
             page += 1
         }
 
-        return Int(totalCents.rounded())
+        let auto = Int(autoCents.rounded())
+        let api = Int(apiCents.rounded())
+        return TodaySpend(totalCents: auto + api, autoCents: auto, apiCents: api)
     }
 
     private static func requestUsageEventsPage(
@@ -191,7 +228,11 @@ enum CursorAPI {
         }
 
         do {
-            return try JSONDecoder().decode(UsageSummary.self, from: data)
+            let summary = try JSONDecoder().decode(UsageSummary.self, from: data)
+            guard summary.hasDisplayableUsage else {
+                throw CursorAPIError.invalidResponse
+            }
+            return summary
         } catch {
             throw CursorAPIError.invalidResponse
         }

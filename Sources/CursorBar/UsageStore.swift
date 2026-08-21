@@ -5,7 +5,7 @@ import PaceCore
 @MainActor
 final class UsageStore: ObservableObject {
     @Published private(set) var summary: UsageSummary?
-    @Published private(set) var todaySpendCents: Int?
+    @Published private(set) var todaySpend: TodaySpend?
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
@@ -32,7 +32,7 @@ final class UsageStore: ObservableObject {
         }
 
         // Daily spend is supplementary; failures here must not break the main display.
-        todaySpendCents = try? await CursorAPI.fetchTodaySpendCents()
+        todaySpend = try? await CursorAPI.fetchTodaySpend()
     }
 
     /// Plain-text fallback for the menu bar while data is unavailable.
@@ -40,43 +40,30 @@ final class UsageStore: ObservableObject {
         if errorMessage != nil, summary == nil {
             return "!"
         }
-        guard let includedPercentUsed else {
+        guard let includedPercentUsed = quotaPercentUsed else {
             return isLoading ? "…" : "!"
         }
         return "\(Int(includedPercentUsed.rounded()))%"
     }
 
+    /// Included-usage color from percent thresholds only. Overspend is a separate red badge.
     var statusColor: Color {
-        if hasOverspend {
-            return .red
-        }
-        return Self.statusColor(for: includedPercentUsed)
+        Self.statusColor(for: quotaPercentUsed)
     }
 
     var planDisplayName: String {
-        summary?.membershipType.capitalized ?? "Unknown"
+        summary?.resolvedMembershipType.capitalized ?? "Unknown"
     }
 
-    /// Guaranteed minimum included credits for auto / composer usage ($200).
-    static let minimumAutoComposerIncludedCents = 20_000
-    /// Guaranteed minimum included credits for named-model API usage ($400).
-    static let minimumApiIncludedCents = 40_000
-    /// Floor for the included pool when the API reports no usage yet.
-    static let minimumIncludedCreditsCents = minimumAutoComposerIncludedCents + minimumApiIncludedCents
-
-    /// Total included credits consumed so far (auto + API), reported directly by the API.
-    /// `breakdown.total` is the *used* amount broken into included + bonus, not the pool size.
+    /// Total included credits consumed so far. `breakdown.total` is used amount, not pool size.
     var includedUsedCreditsCents: Int? {
-        summary?.individualUsage.plan.breakdown.total
+        summary?.includedUsedCents
     }
 
-    /// Included pool size. The API does not expose the pool directly, so recover it from the
-    /// used amount and the reported percentage: pool = used / (percent / 100).
+    /// Included pool size: `overall.limit` when present, otherwise used / (percent / 100).
+    /// Individual plans floor to $600; Enterprise / team never use that floor.
     var includedLimitCreditsCents: Int? {
-        guard let used = includedUsedCreditsCents else { return nil }
-        let percent = summary?.individualUsage.plan.totalPercentUsed ?? 0
-        let derived = percent > 0 ? Int((Double(used) / (percent / 100.0)).rounded()) : 0
-        return max(derived, Self.minimumIncludedCreditsCents)
+        summary?.includedLimitCents
     }
 
     /// Included pool size; alias retained for overspend accounting.
@@ -86,69 +73,70 @@ final class UsageStore: ObservableObject {
 
     /// Included pool usage percentage, as reported by Cursor.
     var includedPercentUsed: Double? {
-        guard summary != nil, includedUsedCreditsCents != nil else { return nil }
-        return summary?.individualUsage.plan.totalPercentUsed
+        summary?.includedPercentUsed
     }
 
-    /// Auto / composer usage as a percentage of its sub-limit, as reported by Cursor.
-    var autoPercentUsed: Double? {
-        guard summary != nil else { return nil }
-        return summary?.individualUsage.plan.autoPercentUsed
+    /// Menu-bar quota: blended included % when present, otherwise the first pool %.
+    var quotaPercentUsed: Double? {
+        includedPercentUsed ?? cursorModelsPercentUsed ?? otherModelsPercentUsed
     }
 
-    /// Named-model API usage as a percentage of its sub-limit, as reported by Cursor.
-    var apiPercentUsed: Double? {
-        summary?.individualUsage.plan.apiPercentUsed
+    /// Cursor Models pool (Auto, Composer, Cursor Grok). Percent only — the API has no dollar cap for this pool.
+    var cursorModelsPercentUsed: Double? {
+        summary?.cursorModelsPercentUsed
     }
 
-    /// Named-model API included sub-limit (e.g. $400).
-    var apiLimitCreditsCents: Int? {
-        guard summary?.individualUsage.plan.enabled == true else { return nil }
-        return summary?.individualUsage.plan.limit
+    /// Other Models pool (named / third-party).
+    var otherModelsPercentUsed: Double? {
+        summary?.otherModelsPercentUsed
     }
 
-    /// API credits consumed, derived from the sub-limit and reported percentage so the dollar
-    /// figure stays consistent with the percentage Cursor displays.
-    var apiUsedCreditsCents: Int? {
-        guard summary?.individualUsage.plan.enabled == true,
-              let limit = apiLimitCreditsCents,
-              let percent = summary?.individualUsage.plan.apiPercentUsed
-        else { return nil }
-        return Int((Double(limit) * percent / 100.0).rounded())
+    var otherModelsLimitCreditsCents: Int? {
+        summary?.otherModelsLimitCents
     }
 
-    /// Auto / composer sub-limit: the included pool minus the API sub-limit.
-    var autoLimitCreditsCents: Int? {
-        guard let includedLimit = includedLimitCreditsCents,
-              let apiLimit = apiLimitCreditsCents
-        else { return nil }
-        return max(includedLimit - apiLimit, Self.minimumAutoComposerIncludedCents)
+    var otherModelsUsedCreditsCents: Int? {
+        summary?.otherModelsUsedCents
     }
 
-    /// Auto / composer credits consumed, derived from its sub-limit and reported percentage.
-    var autoUsedCreditsCents: Int? {
-        guard let limit = autoLimitCreditsCents,
-              let percent = summary?.individualUsage.plan.autoPercentUsed
-        else { return nil }
-        return Int((Double(limit) * percent / 100.0).rounded())
+    var cursorModelsStatusColor: Color {
+        Self.statusColor(for: cursorModelsPercentUsed)
     }
 
-    var apiRemainingCreditsCents: Int? {
-        guard let limit = apiLimitCreditsCents, let used = apiUsedCreditsCents else { return nil }
+    var otherModelsStatusColor: Color {
+        Self.statusColor(for: otherModelsPercentUsed)
+    }
+
+    var otherModelsRemainingCreditsCents: Int? {
+        guard let limit = otherModelsLimitCreditsCents, let used = otherModelsUsedCreditsCents else { return nil }
         return max(limit - used, 0)
     }
 
-    var autoRemainingCreditsCents: Int? {
-        guard let limit = autoLimitCreditsCents, let used = autoUsedCreditsCents else { return nil }
+    /// Individual plans only. Upstream does not expose a Cursor Models dollar cap;
+    /// daily Auto budget still needs remaining $ = included − Other Models.
+    var cursorModelsLimitCreditsCents: Int? {
+        guard summary?.appliesIndividualCreditFloors == true,
+              let included = includedLimitCreditsCents,
+              let other = otherModelsLimitCreditsCents
+        else { return nil }
+        return max(included - other, UsageCredits.minimumCursorModelsIncludedCents)
+    }
+
+    var cursorModelsUsedCreditsCents: Int? {
+        guard let limit = cursorModelsLimitCreditsCents, let percent = cursorModelsPercentUsed else { return nil }
+        return Int((Double(limit) * percent / 100.0).rounded())
+    }
+
+    var cursorModelsRemainingCreditsCents: Int? {
+        guard let limit = cursorModelsLimitCreditsCents, let used = cursorModelsUsedCreditsCents else { return nil }
         return max(limit - used, 0)
     }
 
-    var autoStatusColor: Color {
-        Self.statusColor(for: autoPercentUsed)
-    }
+    var apiRemainingCreditsCents: Int? { otherModelsRemainingCreditsCents }
+    var autoRemainingCreditsCents: Int? { cursorModelsRemainingCreditsCents }
 
-    var apiStatusColor: Color {
-        Self.statusColor(for: apiPercentUsed)
+    var includedStatusColor: Color {
+        Self.statusColor(for: includedPercentUsed)
     }
 
     static func statusColor(for percent: Double?) -> Color {
@@ -164,19 +152,19 @@ final class UsageStore: ObservableObject {
     }
 
     var onDemandEnabled: Bool {
-        summary?.individualUsage.onDemand.enabled ?? false
+        summary?.resolvedOnDemand?.isEnabled ?? false
     }
 
     var onDemandUsedCents: Int {
-        summary?.individualUsage.onDemand.used ?? 0
+        summary?.resolvedOnDemand?.usedCents ?? 0
     }
 
     var onDemandLimitCents: Int? {
-        summary?.individualUsage.onDemand.limit
+        summary?.resolvedOnDemand?.limit
     }
 
     var onDemandRemainingCents: Int? {
-        summary?.individualUsage.onDemand.remaining
+        summary?.resolvedOnDemand?.remaining
     }
 
     /// Usage beyond the included credit pool.
@@ -200,17 +188,6 @@ final class UsageStore: ObservableObject {
         return count > 0 ? count : nil
     }
 
-    /// Workdays from cycle start through today (inclusive), clamped to cycle end.
-    /// Uses endExclusive = startOfDay(tomorrow) ∩ cycleEnd so the current weekday counts.
-    var elapsedWorkingDaysInCycle: Int? {
-        guard let start = billingCycleStartDate, let end = billingCycleEndDate, start < end else { return nil }
-        let calendar = Calendar.current
-        let now = Date()
-        guard now >= start else { return 0 }
-        let endExclusive = PaceCalculator.elapsedEndExclusive(now: now, cycleEnd: end, calendar: calendar)
-        return PaceCalculator.workingDays(from: start, to: endExclusive, calendar: calendar)
-    }
-
     /// Future workdays after today through billing cycle end (`[tomorrow, end)`).
     var remainingWorkingDaysInCycle: Int? {
         guard let end = billingCycleEndDate else { return nil }
@@ -232,39 +209,29 @@ final class UsageStore: ObservableObject {
         return PaceCalculator.dailyBudgetCents(remainingCents: remaining, remainingWorkdays: days)
     }
 
-    var autoAvgDailyCents: Int? {
-        guard let used = autoUsedCreditsCents,
-              let elapsed = elapsedWorkingDaysInCycle
-        else { return nil }
-        return PaceCalculator.avgDailyCents(usedCents: used, elapsedWorkdays: elapsed)
-    }
-
-    var apiAvgDailyCents: Int? {
-        guard let used = apiUsedCreditsCents,
-              let elapsed = elapsedWorkingDaysInCycle
-        else { return nil }
-        return PaceCalculator.avgDailyCents(usedCents: used, elapsedWorkdays: elapsed)
-    }
+    var todaySpendCents: Int? { todaySpend?.totalCents }
+    var todayAutoSpendCents: Int? { todaySpend?.autoCents }
+    var todayApiSpendCents: Int? { todaySpend?.apiCents }
 
     var autoDailyUtilizationPercent: Double? {
-        guard let avg = autoAvgDailyCents, let budget = autoDailyBudgetCents else { return nil }
-        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: avg, dailyBudgetCents: budget)
+        guard let used = todayAutoSpendCents, let budget = autoDailyBudgetCents else { return nil }
+        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: used, dailyBudgetCents: budget)
     }
 
     var apiDailyUtilizationPercent: Double? {
-        guard let avg = apiAvgDailyCents, let budget = apiDailyBudgetCents else { return nil }
-        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: avg, dailyBudgetCents: budget)
+        guard let used = todayApiSpendCents, let budget = apiDailyBudgetCents else { return nil }
+        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: used, dailyBudgetCents: budget)
     }
 
     var apiDailyUtilizationPercentForDisplay: Double? {
         if let pct = apiDailyUtilizationPercent { return pct }
-        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, avgDailyCents: apiAvgDailyCents) { return 100 }
+        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, spendCents: todayApiSpendCents) { return 100 }
         return nil
     }
 
     var autoDailyUtilizationPercentForDisplay: Double? {
         if let pct = autoDailyUtilizationPercent { return pct }
-        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, avgDailyCents: autoAvgDailyCents) { return 100 }
+        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, spendCents: todayAutoSpendCents) { return 100 }
         return nil
     }
 
@@ -277,12 +244,12 @@ final class UsageStore: ObservableObject {
     }
 
     var autoDailyStatusColor: Color {
-        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, avgDailyCents: autoAvgDailyCents) { return .red }
+        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, spendCents: todayAutoSpendCents) { return .red }
         return Self.poolDailyStatusColor(for: autoDailyUtilizationPercent)
     }
 
     var apiDailyStatusColor: Color {
-        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, avgDailyCents: apiAvgDailyCents) { return .red }
+        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, spendCents: todayApiSpendCents) { return .red }
         return Self.poolDailyStatusColor(for: apiDailyUtilizationPercent)
     }
 
@@ -291,7 +258,7 @@ final class UsageStore: ObservableObject {
             percent: autoDailyUtilizationPercent,
             depleted: Self.isDepletedPoolWithBurn(
                 budgetCents: autoDailyBudgetCents,
-                avgDailyCents: autoAvgDailyCents
+                spendCents: todayAutoSpendCents
             )
         )
     }
@@ -301,7 +268,7 @@ final class UsageStore: ObservableObject {
             percent: apiDailyUtilizationPercent,
             depleted: Self.isDepletedPoolWithBurn(
                 budgetCents: apiDailyBudgetCents,
-                avgDailyCents: apiAvgDailyCents
+                spendCents: todayApiSpendCents
             )
         )
     }
@@ -317,21 +284,21 @@ final class UsageStore: ObservableObject {
     }
 
     var autoDailyFootnote: String? {
-        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, avgDailyCents: autoAvgDailyCents) {
+        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, spendCents: todayAutoSpendCents) {
             return "$0/day left · pool exhausted"
         }
         return dailyFootnote(poolLabel: "Auto", remainingCents: autoRemainingCreditsCents, budgetCents: autoDailyBudgetCents)
     }
 
     var apiDailyFootnote: String? {
-        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, avgDailyCents: apiAvgDailyCents) {
+        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, spendCents: todayApiSpendCents) {
             return "$0/day left · pool exhausted"
         }
         return dailyFootnote(poolLabel: "API", remainingCents: apiRemainingCreditsCents, budgetCents: apiDailyBudgetCents)
     }
 
-    private static func isDepletedPoolWithBurn(budgetCents: Int?, avgDailyCents: Int?) -> Bool {
-        (budgetCents ?? -1) == 0 && (avgDailyCents ?? 0) > 0
+    private static func isDepletedPoolWithBurn(budgetCents: Int?, spendCents: Int?) -> Bool {
+        (budgetCents ?? -1) == 0 && (spendCents ?? 0) > 0
     }
 
     /// Included remaining redistributed across future workdays (same formula as Auto/API daily).

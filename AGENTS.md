@@ -16,7 +16,7 @@ updated: 2026-08-21
 **CRITICAL:** Product name is `cursorbar-pace` (fork of CursorBar). Soft-diverge from upstream `c-johannesen/cursorbar` (MIT).
 **MANDATORY:** Durable product/requirements truth → `@docs/` (symlink into vault).
 **MANDATORY:** Active spec = nested dropdown (Included = Auto/API **monthly pool %**; Daily = Auto/API **today $** vs `remaining ÷ remaining workdays`) + menu bar A/P = same daily — `@docs/Specs/2026-08-20 – Redistributing daily.md`. Today split = events + model rule in that spec. Menu bar quiet default = Daily total; auto-splits to A/P when a daily pool is ≥70% — `@docs/Specs/2026-08-21 – Auto-split daily warning.md`.
-**MANDATORY:** Remote for upstream is `upstream` (not `origin` until a personal fork remote is added).
+**MANDATORY:** Remote for upstream is `upstream`; personal fork is `origin` (`Jlosev/cursorbar`).
 
 ---
 

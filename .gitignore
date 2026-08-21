@@ -6,3 +6,4 @@ CursorBar.app/
 CursorBar-*.zip
 .DS_Store
 /docs
+.worktrees/

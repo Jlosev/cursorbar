@@ -39,43 +39,30 @@ final class UsageStore: ObservableObject {
         if errorMessage != nil, summary == nil {
             return "!"
         }
-        guard let includedPercentUsed else {
+        guard let includedPercentUsed = quotaPercentUsed else {
             return isLoading ? "…" : "!"
         }
         return "\(Int(includedPercentUsed.rounded()))%"
     }
 
+    /// Included-usage color from percent thresholds only. Overspend is a separate red badge.
     var statusColor: Color {
-        if hasOverspend {
-            return .red
-        }
-        return Self.statusColor(for: includedPercentUsed)
+        Self.statusColor(for: quotaPercentUsed)
     }
 
     var planDisplayName: String {
-        summary?.membershipType.capitalized ?? "Unknown"
+        summary?.resolvedMembershipType.capitalized ?? "Unknown"
     }
 
-    /// Guaranteed minimum included credits for auto / composer usage ($200).
-    static let minimumAutoComposerIncludedCents = 20_000
-    /// Guaranteed minimum included credits for named-model API usage ($400).
-    static let minimumApiIncludedCents = 40_000
-    /// Floor for the included pool when the API reports no usage yet.
-    static let minimumIncludedCreditsCents = minimumAutoComposerIncludedCents + minimumApiIncludedCents
-
-    /// Total included credits consumed so far (auto + API), reported directly by the API.
-    /// `breakdown.total` is the *used* amount broken into included + bonus, not the pool size.
+    /// Total included credits consumed so far. `breakdown.total` is used amount, not pool size.
     var includedUsedCreditsCents: Int? {
-        summary?.individualUsage.plan.breakdown.total
+        summary?.includedUsedCents
     }
 
-    /// Included pool size. The API does not expose the pool directly, so recover it from the
-    /// used amount and the reported percentage: pool = used / (percent / 100).
+    /// Included pool size: `overall.limit` when present, otherwise used / (percent / 100).
+    /// Individual plans floor to $600; Enterprise / team never use that floor.
     var includedLimitCreditsCents: Int? {
-        guard let used = includedUsedCreditsCents else { return nil }
-        let percent = summary?.individualUsage.plan.totalPercentUsed ?? 0
-        let derived = percent > 0 ? Int((Double(used) / (percent / 100.0)).rounded()) : 0
-        return max(derived, Self.minimumIncludedCreditsCents)
+        summary?.includedLimitCents
     }
 
     /// Included pool size; alias retained for overspend accounting.
@@ -85,59 +72,42 @@ final class UsageStore: ObservableObject {
 
     /// Included pool usage percentage, as reported by Cursor.
     var includedPercentUsed: Double? {
-        guard summary != nil, includedUsedCreditsCents != nil else { return nil }
-        return summary?.individualUsage.plan.totalPercentUsed
+        summary?.includedPercentUsed
     }
 
-    /// Auto / composer usage as a percentage of its sub-limit, as reported by Cursor.
-    var autoPercentUsed: Double? {
-        guard summary != nil else { return nil }
-        return summary?.individualUsage.plan.autoPercentUsed
+    /// Menu-bar quota: blended included % when present, otherwise the first pool %.
+    var quotaPercentUsed: Double? {
+        includedPercentUsed ?? cursorModelsPercentUsed ?? otherModelsPercentUsed
     }
 
-    /// Named-model API usage as a percentage of its sub-limit, as reported by Cursor.
-    var apiPercentUsed: Double? {
-        summary?.individualUsage.plan.apiPercentUsed
+    /// Cursor Models pool (Auto, Composer, Cursor Grok). Percent only — the API has no dollar cap for this pool.
+    var cursorModelsPercentUsed: Double? {
+        summary?.cursorModelsPercentUsed
     }
 
-    /// Named-model API included sub-limit (e.g. $400).
-    var apiLimitCreditsCents: Int? {
-        guard summary?.individualUsage.plan.enabled == true else { return nil }
-        return summary?.individualUsage.plan.limit
+    /// Other Models pool (named / third-party).
+    var otherModelsPercentUsed: Double? {
+        summary?.otherModelsPercentUsed
     }
 
-    /// API credits consumed, derived from the sub-limit and reported percentage so the dollar
-    /// figure stays consistent with the percentage Cursor displays.
-    var apiUsedCreditsCents: Int? {
-        guard summary?.individualUsage.plan.enabled == true,
-              let limit = apiLimitCreditsCents,
-              let percent = summary?.individualUsage.plan.apiPercentUsed
-        else { return nil }
-        return Int((Double(limit) * percent / 100.0).rounded())
+    var otherModelsLimitCreditsCents: Int? {
+        summary?.otherModelsLimitCents
     }
 
-    /// Auto / composer sub-limit: the included pool minus the API sub-limit.
-    var autoLimitCreditsCents: Int? {
-        guard let includedLimit = includedLimitCreditsCents,
-              let apiLimit = apiLimitCreditsCents
-        else { return nil }
-        return max(includedLimit - apiLimit, Self.minimumAutoComposerIncludedCents)
+    var otherModelsUsedCreditsCents: Int? {
+        summary?.otherModelsUsedCents
     }
 
-    /// Auto / composer credits consumed, derived from its sub-limit and reported percentage.
-    var autoUsedCreditsCents: Int? {
-        guard let limit = autoLimitCreditsCents,
-              let percent = summary?.individualUsage.plan.autoPercentUsed
-        else { return nil }
-        return Int((Double(limit) * percent / 100.0).rounded())
+    var cursorModelsStatusColor: Color {
+        Self.statusColor(for: cursorModelsPercentUsed)
     }
 
-    var autoStatusColor: Color {
-        Self.statusColor(for: autoPercentUsed)
+    var otherModelsStatusColor: Color {
+        Self.statusColor(for: otherModelsPercentUsed)
     }
 
-    var apiStatusColor: Color {
-        Self.statusColor(for: apiPercentUsed)
+    var includedStatusColor: Color {
+        Self.statusColor(for: includedPercentUsed)
     }
 
     static func statusColor(for percent: Double?) -> Color {
@@ -153,19 +123,19 @@ final class UsageStore: ObservableObject {
     }
 
     var onDemandEnabled: Bool {
-        summary?.individualUsage.onDemand.enabled ?? false
+        summary?.resolvedOnDemand?.isEnabled ?? false
     }
 
     var onDemandUsedCents: Int {
-        summary?.individualUsage.onDemand.used ?? 0
+        summary?.resolvedOnDemand?.usedCents ?? 0
     }
 
     var onDemandLimitCents: Int? {
-        summary?.individualUsage.onDemand.limit
+        summary?.resolvedOnDemand?.limit
     }
 
     var onDemandRemainingCents: Int? {
-        summary?.individualUsage.onDemand.remaining
+        summary?.resolvedOnDemand?.remaining
     }
 
     /// Usage beyond the included credit pool.

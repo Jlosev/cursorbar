@@ -1,6 +1,7 @@
 import AppKit
 import PaceCore
 import SwiftUI
+import PaceCore
 
 @main
 enum CursorBarMain {
@@ -80,13 +81,31 @@ enum MenuBarPrefs {
     static let showAgentsKey = "menuBarShowAgents"
 }
 
+@MainActor
+private func menuBarSplit(
+    store: UsageStore,
+    showDaily: Bool,
+    showAuto: Bool,
+    showApi: Bool
+) -> MenuBarSplitPolicy.Effective {
+    MenuBarSplitPolicy.effectiveVisibility(
+        prefs: MenuBarSplitPolicy.Prefs(
+            showDaily: showDaily,
+            showAuto: showAuto,
+            showApi: showApi
+        ),
+        autoIsWarning: store.autoDailyIsWarning,
+        apiIsWarning: store.apiDailyIsWarning
+    )
+}
+
 private struct MenuBarLabel: View {
     @ObservedObject var store: UsageStore
     @ObservedObject var agents: AgentMonitor
     @AppStorage(MenuBarPrefs.showQuotaKey) private var showQuota = false
-    @AppStorage(MenuBarPrefs.showAutoPaceKey) private var showAutoPace = true
-    @AppStorage(MenuBarPrefs.showApiPaceKey) private var showApiPace = true
-    @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = false
+    @AppStorage(MenuBarPrefs.showAutoPaceKey) private var showAutoPace = false
+    @AppStorage(MenuBarPrefs.showApiPaceKey) private var showApiPace = false
+    @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = true
     @AppStorage(MenuBarPrefs.showOverspendKey) private var showOverspend = true
     @AppStorage(MenuBarPrefs.showAgentsKey) private var showAgents = true
     @StateObject private var chrome = MenuBarChromeMonitor()
@@ -106,12 +125,21 @@ private struct MenuBarLabel: View {
         }
     }
 
+    private var split: MenuBarSplitPolicy.Effective {
+        menuBarSplit(
+            store: store,
+            showDaily: showDaily,
+            showAuto: showAutoPace,
+            showApi: showApiPace
+        )
+    }
+
     private var hasVisibleContent: Bool {
         showAgents
             || showQuota
-            || showAutoPace
-            || showApiPace
-            || showDaily
+            || split.showAuto
+            || split.showApi
+            || split.showDaily
             || (showOverspend && store.hasOverspend)
     }
 
@@ -132,7 +160,7 @@ private struct MenuBarLabel: View {
                     isDark: isDark
                 )
             }
-            if showAutoPace {
+            if split.showAuto {
                 MenuBarBarGauge(
                     percent: store.autoDailyUtilizationPercentForDisplay,
                     fillColor: store.autoDailyStatusColor,
@@ -140,7 +168,7 @@ private struct MenuBarLabel: View {
                     prefix: "A"
                 )
             }
-            if showApiPace {
+            if split.showApi {
                 MenuBarBarGauge(
                     percent: store.apiDailyUtilizationPercentForDisplay,
                     fillColor: store.apiDailyStatusColor,
@@ -148,7 +176,7 @@ private struct MenuBarLabel: View {
                     prefix: "P"
                 )
             }
-            if showDaily {
+            if split.showDaily {
                 MenuBarBarGauge(
                     percent: store.dailyUtilizationPercent,
                     fillColor: store.dailyStatusColor,
@@ -351,9 +379,9 @@ private struct MenuContentView: View {
     @ObservedObject var agents: AgentMonitor
     @State private var showSettings = false
     @AppStorage(MenuBarPrefs.showQuotaKey) private var showQuota = false
-    @AppStorage(MenuBarPrefs.showAutoPaceKey) private var showAutoPace = true
-    @AppStorage(MenuBarPrefs.showApiPaceKey) private var showApiPace = true
-    @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = false
+    @AppStorage(MenuBarPrefs.showAutoPaceKey) private var showAutoPace = false
+    @AppStorage(MenuBarPrefs.showApiPaceKey) private var showApiPace = false
+    @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = true
     @AppStorage(MenuBarPrefs.showOverspendKey) private var showOverspend = true
     @AppStorage(MenuBarPrefs.showAgentsKey) private var showAgents = true
 
@@ -390,6 +418,15 @@ private struct MenuContentView: View {
         .frame(width: 280)
     }
 
+    private var split: MenuBarSplitPolicy.Effective {
+        menuBarSplit(
+            store: store,
+            showDaily: showDaily,
+            showAuto: showAutoPace,
+            showApi: showApiPace
+        )
+    }
+
     private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Show in menu bar")
@@ -401,6 +438,12 @@ private struct MenuContentView: View {
             Toggle("API daily (P)", isOn: $showApiPace)
             Toggle("Daily total (mixed)", isOn: $showDaily)
             Toggle("Overspend amount", isOn: $showOverspend)
+
+            if split.isOverride {
+                Text("Showing A/P because a daily pool is ≥70%")
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .toggleStyle(.checkbox)
         .font(.caption)

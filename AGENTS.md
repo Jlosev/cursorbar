@@ -1,6 +1,6 @@
 ---
 created: 2026-08-07
-updated: 2026-08-20
+updated: 2026-08-21
 ---
 
 # AGENTS.md – cursorbar-pace
@@ -15,14 +15,14 @@ updated: 2026-08-20
 **CRITICAL:** Code lives in this repo (`~/Documents/03_Projects/cursorbar-pace`); never treat Obsidian vault checkout as the code root.
 **CRITICAL:** Product name is `cursorbar-pace` (fork of CursorBar). Soft-diverge from upstream `c-johannesen/cursorbar` (MIT).
 **MANDATORY:** Durable product/requirements truth → `@docs/` (symlink into vault).
-**MANDATORY:** Active spec = nested dropdown (Included = Auto/API **monthly pool %**; Daily = Auto/API **avg burn**) + menu bar A/P = daily — `@docs/Specs/2026-08-20 – Redistributing daily.md`. No event/model heuristic.
-**MANDATORY:** Remote for upstream is `upstream` (not `origin` until a personal fork remote is added).
+**MANDATORY:** Active spec = nested dropdown (Included = Auto/API **monthly pool %**; Daily = Auto/API **today $** vs `remaining ÷ remaining workdays`) + menu bar A/P = same daily — `@docs/Specs/2026-08-20 – Redistributing daily.md`. Today split = events + model rule in that spec.
+**MANDATORY:** Remote for upstream is `upstream`; personal fork is `origin` (`Jlosev/cursorbar`).
 
 ---
 
 ## Контекст
 
-macOS menu bar fork of [c-johannesen/cursorbar](https://github.com/c-johannesen/cursorbar). Problem: upstream `D` mixes Auto+API today-spend; fork shows per-pool **A/P** = avg burn vs `remaining ÷ remaining workdays` so API quota is not burned early.
+macOS menu bar fork of [c-johannesen/cursorbar](https://github.com/c-johannesen/cursorbar). Problem: upstream `D` mixes Auto+API today-spend; fork shows per-pool **A/P** = today’s Auto/API vs `remaining ÷ remaining workdays` so API quota is not burned early.
 
 ## Канон
 
@@ -41,7 +41,7 @@ ln -sfn "../../../Library/Mobile Documents/iCloud~md~obsidian/Documents/Evgeniy 
 ```
 
 - Do not commit vault contents via `docs/` (`/docs` is gitignored).
-- Redistributing daily: `daily_budget = remaining / remaining_workdays` where remaining days = `[tomorrow, cycleEnd)`; `utilization = avg_daily / daily_budget`. Defer today-$ split.
+- Redistributing daily: `daily_budget = remaining / remaining_workdays` where remaining days = `[tomorrow, cycleEnd)`; `utilization = today_pool / daily_budget`.
 - Ship as upstream `CursorBar` / `com.cursorbar.app` (needed for a PR back to `c-johannesen/cursorbar`).
 
 ## Стек и инструменты
@@ -71,4 +71,4 @@ ln -sfn "../../../Library/Mobile Documents/iCloud~md~obsidian/Documents/Evgeniy 
 - Methodology twin: `~/Documents/03_Projects/skillgraph` (docs symlink pattern)
 
 ---
-updated: 2026-08-20
+updated: 2026-08-21

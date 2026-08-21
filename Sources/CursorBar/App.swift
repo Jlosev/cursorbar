@@ -576,7 +576,7 @@ private struct MenuContentView: View {
                         title: "Auto daily",
                         percent: autoPct,
                         color: store.autoDailyStatusColor,
-                        usedCents: store.autoAvgDailyCents,
+                        usedCents: store.todayAutoSpendCents,
                         limitCents: store.autoDailyBudgetCents,
                         indented: true
                     )
@@ -587,7 +587,7 @@ private struct MenuContentView: View {
                         title: "API daily",
                         percent: apiPct,
                         color: store.apiDailyStatusColor,
-                        usedCents: store.apiAvgDailyCents,
+                        usedCents: store.todayApiSpendCents,
                         limitCents: store.apiDailyBudgetCents,
                         indented: true
                     )

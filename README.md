@@ -1,13 +1,13 @@
 # cursorbar-pace
 
-Personal fork of [CursorBar](https://github.com/c-johannesen/cursorbar) with nested dropdown meters and **Auto** / **API daily** bars in the menu bar — avg burn vs redistributing daily budget (`remaining ÷ remaining workdays`), so API quota is not burned early.
+Personal fork of [CursorBar](https://github.com/c-johannesen/cursorbar) with nested dropdown meters and **Auto** / **API daily** bars in the menu bar — today’s spend vs redistributing daily budget (`remaining ÷ remaining workdays`), so API quota is not burned early.
 
 **Docs:** product hub and requirements live in Obsidian (`docs/` symlink in the main repo layout). See `CursorBar Pace – Hub.md` and `Specs/2026-08-20 – Redistributing daily.md`.
 
 ### Fork features
 
-- **Dropdown:** Included (Auto/API pool %) + Daily (Auto/API avg burn vs redistributed budget)
-- **Menu bar A/P** — daily avg burn gauges vs `remaining ÷ remaining workdays`
+- **Dropdown:** Included (Auto/API pool %) + Daily (today’s Auto/API vs redistributed budget)
+- **Menu bar A/P** — today’s Auto/API vs `remaining ÷ remaining workdays`
 - **Unused quota raises later daily budgets** (quiet days redistribute)
 - **Mixed daily utilization (`D`)** — optional legacy toggle, off by default
 

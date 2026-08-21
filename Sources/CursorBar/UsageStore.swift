@@ -5,7 +5,7 @@ import PaceCore
 @MainActor
 final class UsageStore: ObservableObject {
     @Published private(set) var summary: UsageSummary?
-    @Published private(set) var todaySpendCents: Int?
+    @Published private(set) var todaySpend: TodaySpend?
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
@@ -32,7 +32,7 @@ final class UsageStore: ObservableObject {
         }
 
         // Daily spend is supplementary; failures here must not break the main display.
-        todaySpendCents = try? await CursorAPI.fetchTodaySpendCents()
+        todaySpend = try? await CursorAPI.fetchTodaySpend()
     }
 
     /// Plain-text fallback for the menu bar while data is unavailable.
@@ -200,17 +200,6 @@ final class UsageStore: ObservableObject {
         return count > 0 ? count : nil
     }
 
-    /// Workdays from cycle start through today (inclusive), clamped to cycle end.
-    /// Uses endExclusive = startOfDay(tomorrow) ∩ cycleEnd so the current weekday counts.
-    var elapsedWorkingDaysInCycle: Int? {
-        guard let start = billingCycleStartDate, let end = billingCycleEndDate, start < end else { return nil }
-        let calendar = Calendar.current
-        let now = Date()
-        guard now >= start else { return 0 }
-        let endExclusive = PaceCalculator.elapsedEndExclusive(now: now, cycleEnd: end, calendar: calendar)
-        return PaceCalculator.workingDays(from: start, to: endExclusive, calendar: calendar)
-    }
-
     /// Future workdays after today through billing cycle end (`[tomorrow, end)`).
     var remainingWorkingDaysInCycle: Int? {
         guard let end = billingCycleEndDate else { return nil }
@@ -232,39 +221,29 @@ final class UsageStore: ObservableObject {
         return PaceCalculator.dailyBudgetCents(remainingCents: remaining, remainingWorkdays: days)
     }
 
-    var autoAvgDailyCents: Int? {
-        guard let used = autoUsedCreditsCents,
-              let elapsed = elapsedWorkingDaysInCycle
-        else { return nil }
-        return PaceCalculator.avgDailyCents(usedCents: used, elapsedWorkdays: elapsed)
-    }
-
-    var apiAvgDailyCents: Int? {
-        guard let used = apiUsedCreditsCents,
-              let elapsed = elapsedWorkingDaysInCycle
-        else { return nil }
-        return PaceCalculator.avgDailyCents(usedCents: used, elapsedWorkdays: elapsed)
-    }
+    var todaySpendCents: Int? { todaySpend?.totalCents }
+    var todayAutoSpendCents: Int? { todaySpend?.autoCents }
+    var todayApiSpendCents: Int? { todaySpend?.apiCents }
 
     var autoDailyUtilizationPercent: Double? {
-        guard let avg = autoAvgDailyCents, let budget = autoDailyBudgetCents else { return nil }
-        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: avg, dailyBudgetCents: budget)
+        guard let used = todayAutoSpendCents, let budget = autoDailyBudgetCents else { return nil }
+        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: used, dailyBudgetCents: budget)
     }
 
     var apiDailyUtilizationPercent: Double? {
-        guard let avg = apiAvgDailyCents, let budget = apiDailyBudgetCents else { return nil }
-        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: avg, dailyBudgetCents: budget)
+        guard let used = todayApiSpendCents, let budget = apiDailyBudgetCents else { return nil }
+        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: used, dailyBudgetCents: budget)
     }
 
     var apiDailyUtilizationPercentForDisplay: Double? {
         if let pct = apiDailyUtilizationPercent { return pct }
-        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, avgDailyCents: apiAvgDailyCents) { return 100 }
+        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, spendCents: todayApiSpendCents) { return 100 }
         return nil
     }
 
     var autoDailyUtilizationPercentForDisplay: Double? {
         if let pct = autoDailyUtilizationPercent { return pct }
-        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, avgDailyCents: autoAvgDailyCents) { return 100 }
+        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, spendCents: todayAutoSpendCents) { return 100 }
         return nil
     }
 
@@ -277,12 +256,12 @@ final class UsageStore: ObservableObject {
     }
 
     var autoDailyStatusColor: Color {
-        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, avgDailyCents: autoAvgDailyCents) { return .red }
+        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, spendCents: todayAutoSpendCents) { return .red }
         return Self.poolDailyStatusColor(for: autoDailyUtilizationPercent)
     }
 
     var apiDailyStatusColor: Color {
-        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, avgDailyCents: apiAvgDailyCents) { return .red }
+        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, spendCents: todayApiSpendCents) { return .red }
         return Self.poolDailyStatusColor(for: apiDailyUtilizationPercent)
     }
 
@@ -297,21 +276,21 @@ final class UsageStore: ObservableObject {
     }
 
     var autoDailyFootnote: String? {
-        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, avgDailyCents: autoAvgDailyCents) {
+        if Self.isDepletedPoolWithBurn(budgetCents: autoDailyBudgetCents, spendCents: todayAutoSpendCents) {
             return "$0/day left · pool exhausted"
         }
         return dailyFootnote(poolLabel: "Auto", remainingCents: autoRemainingCreditsCents, budgetCents: autoDailyBudgetCents)
     }
 
     var apiDailyFootnote: String? {
-        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, avgDailyCents: apiAvgDailyCents) {
+        if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, spendCents: todayApiSpendCents) {
             return "$0/day left · pool exhausted"
         }
         return dailyFootnote(poolLabel: "API", remainingCents: apiRemainingCreditsCents, budgetCents: apiDailyBudgetCents)
     }
 
-    private static func isDepletedPoolWithBurn(budgetCents: Int?, avgDailyCents: Int?) -> Bool {
-        (budgetCents ?? -1) == 0 && (avgDailyCents ?? 0) > 0
+    private static func isDepletedPoolWithBurn(budgetCents: Int?, spendCents: Int?) -> Bool {
+        (budgetCents ?? -1) == 0 && (spendCents ?? 0) > 0
     }
 
     /// Included remaining redistributed across future workdays (same formula as Auto/API daily).

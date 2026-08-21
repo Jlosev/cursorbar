@@ -134,6 +134,25 @@ final class PaceCalculatorTests: XCTestCase {
         XCTAssertNil(PaceCalculator.dailyUtilizationPercent(avgDailyCents: 100, dailyBudgetCents: 0))
     }
 
+    func testDailyUtilization_zeroTodayIsZeroPercent() {
+        let pct = PaceCalculator.dailyUtilizationPercent(avgDailyCents: 0, dailyBudgetCents: 2_000)
+        XCTAssertEqual(pct!, 0.0, accuracy: 0.01)
+    }
+
+    func testPoolClassifier_firstPartyIsAuto() {
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "composer-2.5-fast"), .auto)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "cursor-grok-4.6-high-fast"), .auto)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "default"), .auto)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "auto"), .auto)
+    }
+
+    func testPoolClassifier_namedModelsAreAPI() {
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "claude-opus-5-thinking-high"), .api)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "gpt-5"), .api)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: nil), .api)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: ""), .api)
+    }
+
     // Keep existing elapsedEndExclusive tests
     func testElapsedEndExclusive_includesToday() {
         let now = date(2026, 8, 5)

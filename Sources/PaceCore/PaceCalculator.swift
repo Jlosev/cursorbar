@@ -34,7 +34,7 @@ public enum PaceCalculator {
     }
 
     /// Future workdays after today through cycle end: `[tomorrow, cycleEnd)`.
-    /// Today is excluded so it is not double-counted with elapsed (today’s spend is already in avg burn).
+    /// Today is excluded so today’s spend is not also reserved in remaining workdays.
     public static func remainingWorkdays(
         now: Date,
         cycleEnd: Date,

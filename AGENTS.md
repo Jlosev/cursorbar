@@ -65,6 +65,34 @@ ln -sfn "../../../Library/Mobile Documents/iCloud~md~obsidian/Documents/Evgeniy 
 2. After durable decisions, enrich Hub/Specs with pointers (not session dumps).
 3. Implementation plans → `@docs/Plans/` with date prefix `YYYY-MM-DD – …`.
 
+## Cursor Cloud specific instructions
+
+Cloud Agent VMs are **Linux x86_64**. The `CursorBar` app target (`Sources/CursorBar/*`) imports AppKit/SwiftUI/SQLite3 and is **macOS 14+ only** — it **cannot be built or run here**. Real build/run/CI is macOS only: `bash scripts/package.sh --install --open`, CI on `macos-15` (`.github/workflows/release.yml`).
+
+What *is* buildable/testable on Linux: the cross-platform, Foundation-only `PaceCore` library (`Sources/PaceCore/*`) — the fork's pace logic — plus `Tests/PaceCoreTests`.
+
+- Swift (via swiftly) is preinstalled and on `PATH` (`swift --version` → 6.x). No per-session install needed.
+- Build the core: `swift build --target PaceCore` (repo root works).
+- **`swift test` at repo root FAILS on Linux** — it also compiles the macOS `CursorBar` target (`no such module 'AppKit'`). `--target` and `--build-tests` are mutually exclusive, so run the core tests via a throwaway wrapper package that references only the cross-platform sources:
+
+```bash
+W=$(mktemp -d); mkdir -p "$W/Sources" "$W/Tests"
+ln -s /workspace/Sources/PaceCore "$W/Sources/PaceCore"
+ln -s /workspace/Tests/PaceCoreTests "$W/Tests/PaceCoreTests"
+cat > "$W/Package.swift" <<'PKG'
+// swift-tools-version: 6.0
+import PackageDescription
+let package = Package(name: "PaceCore", targets: [
+  .target(name: "PaceCore", path: "Sources/PaceCore"),
+  .testTarget(name: "PaceCoreTests", dependencies: ["PaceCore"], path: "Tests/PaceCoreTests"),
+])
+PKG
+(cd "$W" && swift test)   # 38 tests, 0 failures
+```
+
+- No external SwiftPM dependencies; the startup update script just runs `swift package resolve`.
+- No lint config is committed; `swift-format` is available in the toolchain if needed.
+
 ## Связанные правила
 
 - User AGENTS.md core rule – bootstrap/enrich protocol

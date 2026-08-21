@@ -18,14 +18,17 @@ enum CursorBarMain {
             defer { group.leave() }
             do {
                 let summary = try await CursorAPI.fetchUsageSummary()
-                let plan = summary.individualUsage.plan
-                let onDemand = summary.individualUsage.onDemand
-                let used = Double(plan.breakdown.total)
-                let pool = plan.totalPercentUsed > 0 ? used / (plan.totalPercentUsed / 100.0) : 0
-                let overage = max(used - pool, 0)
-                let onDemandUsed = onDemand.enabled ? Double(onDemand.used) : 0
+                if summary.isUnlimitedPlan {
+                    print("OK unlimited")
+                    exit(0)
+                }
+                let used = Double(summary.includedUsedCents ?? 0)
+                let pool = Double(summary.includedLimitCents ?? 0)
+                let overage = pool > 0 ? max(used - pool, 0) : 0
+                let onDemand = summary.resolvedOnDemand
+                let onDemandUsed = onDemand?.isEnabled == true ? Double(onDemand?.usedCents ?? 0) : 0
                 let overspend = overage + onDemandUsed
-                let percent = min(plan.totalPercentUsed, 100)
+                let percent = min(summary.includedPercentUsed ?? 0, 100)
                 if overspend > 0 {
                     print(String(format: "OK %.0f%% (overspend $%.2f)", percent, overspend / 100.0))
                 } else {
@@ -121,7 +124,7 @@ private struct MenuBarLabel: View {
             }
             if showQuota {
                 MenuBarRingGauge(
-                    percent: store.includedPercentUsed,
+                    percent: store.quotaPercentUsed,
                     fillColor: store.statusColor,
                     isDark: isDark
                 )
@@ -313,7 +316,7 @@ private struct UsageMeterView: View {
             HStack(spacing: 8) {
                 Text(title)
                     .font(.caption.weight(.medium))
-                    .frame(width: 96, alignment: .leading)
+                    .frame(width: 110, alignment: .leading)
                     .lineLimit(1)
 
                 ProgressView(value: min(max(percent / 100.0, 0), 1))
@@ -510,8 +513,8 @@ private struct MenuContentView: View {
     @ViewBuilder
     private var usageSection: some View {
         let hasIncludedBlock = store.includedPercentUsed != nil
-            || store.autoPercentUsed != nil
-            || store.apiPercentUsed != nil
+            || store.cursorModelsPercentUsed != nil
+            || store.otherModelsPercentUsed != nil
         let hasDailyBlock = store.dailyUtilizationPercent != nil
             || store.autoDailyUtilizationPercentForDisplay != nil
             || store.apiDailyUtilizationPercentForDisplay != nil
@@ -522,30 +525,28 @@ private struct MenuContentView: View {
                     UsageMeterView(
                         title: "Included usage",
                         percent: percentUsed,
-                        color: store.statusColor,
+                        color: store.includedStatusColor,
                         usedCents: store.includedUsedCreditsCents,
                         limitCents: store.includedLimitCreditsCents
                     )
                 }
 
-                if let autoPct = store.autoPercentUsed {
+                if let cursorModelsPercent = store.cursorModelsPercentUsed {
                     UsageMeterView(
-                        title: "Auto",
-                        percent: autoPct,
-                        color: store.autoStatusColor,
-                        usedCents: store.autoUsedCreditsCents,
-                        limitCents: store.autoLimitCreditsCents,
+                        title: "Cursor Models",
+                        percent: cursorModelsPercent,
+                        color: store.cursorModelsStatusColor,
                         indented: true
                     )
                 }
 
-                if let apiPct = store.apiPercentUsed {
+                if let otherModelsPercent = store.otherModelsPercentUsed {
                     UsageMeterView(
-                        title: "API",
-                        percent: apiPct,
-                        color: store.apiStatusColor,
-                        usedCents: store.apiUsedCreditsCents,
-                        limitCents: store.apiLimitCreditsCents,
+                        title: "Other Models",
+                        percent: otherModelsPercent,
+                        color: store.otherModelsStatusColor,
+                        usedCents: store.otherModelsUsedCreditsCents,
+                        limitCents: store.otherModelsLimitCreditsCents,
                         indented: true
                     )
                 }

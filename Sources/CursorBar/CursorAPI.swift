@@ -19,41 +19,60 @@ enum CursorAPIError: Error, LocalizedError {
 }
 
 struct UsageBreakdown: Decodable, Sendable {
-    let included: Int
-    let bonus: Int
-    let total: Int
+    let included: Int?
+    let bonus: Int?
+    let total: Int?
 }
 
 struct PlanUsage: Decodable, Sendable {
-    let enabled: Bool
-    let used: Int
-    let limit: Int
-    let remaining: Int
-    let breakdown: UsageBreakdown
-    let autoPercentUsed: Double
-    let apiPercentUsed: Double
-    let totalPercentUsed: Double
+    let enabled: Bool?
+    let used: Int?
+    let limit: Int?
+    let remaining: Int?
+    let breakdown: UsageBreakdown?
+    let autoPercentUsed: Double?
+    let apiPercentUsed: Double?
+    let totalPercentUsed: Double?
 }
 
 struct OnDemandUsage: Decodable, Sendable {
-    let enabled: Bool
-    let used: Int
+    let enabled: Bool?
+    let used: Int?
+    let limit: Int?
+    let remaining: Int?
+
+    var isEnabled: Bool { enabled ?? false }
+    var usedCents: Int { used ?? 0 }
+}
+
+/// Spend on token-based Enterprise contracts that omit `plan`.
+struct OverallUsage: Decodable, Sendable {
+    let enabled: Bool?
+    let used: Int?
     let limit: Int?
     let remaining: Int?
 }
 
 struct IndividualUsage: Decodable, Sendable {
-    let plan: PlanUsage
-    let onDemand: OnDemandUsage
+    let plan: PlanUsage?
+    let onDemand: OnDemandUsage?
+    let overall: OverallUsage?
+}
+
+struct TeamUsage: Decodable, Sendable {
+    let onDemand: OnDemandUsage?
 }
 
 struct UsageSummary: Decodable, Sendable {
-    let billingCycleStart: String
-    let billingCycleEnd: String
-    let membershipType: String
-    let limitType: String
-    let isUnlimited: Bool
-    let individualUsage: IndividualUsage
+    let billingCycleStart: String?
+    let billingCycleEnd: String?
+    let membershipType: String?
+    let limitType: String?
+    let isUnlimited: Bool?
+    let autoModelSelectedDisplayMessage: String?
+    let namedModelSelectedDisplayMessage: String?
+    let individualUsage: IndividualUsage?
+    let teamUsage: TeamUsage?
 }
 
 struct UsageEventsPage: Decodable, Sendable {
@@ -209,7 +228,11 @@ enum CursorAPI {
         }
 
         do {
-            return try JSONDecoder().decode(UsageSummary.self, from: data)
+            let summary = try JSONDecoder().decode(UsageSummary.self, from: data)
+            guard summary.hasDisplayableUsage else {
+                throw CursorAPIError.invalidResponse
+            }
+            return summary
         } catch {
             throw CursorAPIError.invalidResponse
         }

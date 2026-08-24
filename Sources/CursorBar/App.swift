@@ -1,4 +1,5 @@
 import AppKit
+import PaceCore
 import SwiftUI
 
 @main
@@ -279,19 +280,20 @@ private struct MenuBarBarGauge: View {
     }
 
     var body: some View {
+        // No GeometryReader: ImageRenderer gives it a zero proposed size, so a
+        // 0% fill made the whole Daily/A/P strip collapse.
         ZStack {
-            GeometryReader { geometry in
-                ZStack(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(trackColor)
+            HStack(spacing: 0) {
+                let fillWidth = MenuBarBarFill.width(percent: percent, in: width)
+                if fillWidth > 0 {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(trackColor)
-                    if let percent {
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(fillColor.opacity(0.85))
-                            .frame(width: max(geometry.size.width * min(percent / 100.0, 1), percent > 0 ? 4 : 0))
-                    }
+                        .fill(fillColor.opacity(0.85))
+                        .frame(width: fillWidth)
                 }
+                Spacer(minLength: 0)
             }
-
             Text(valueText)
                 .font(.system(size: prefix == nil ? 9 : 8, weight: .semibold, design: .monospaced))
                 .foregroundStyle(textColor)

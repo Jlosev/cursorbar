@@ -37,9 +37,10 @@ public enum MenuBarSplitPolicy {
     public static func effectiveVisibility(
         prefs: Prefs,
         autoIsWarning: Bool,
-        apiIsWarning: Bool
+        apiIsWarning: Bool,
+        autoSplitEnabled: Bool = true
     ) -> Effective {
-        let shouldOverride = prefs.showDaily && (autoIsWarning || apiIsWarning)
+        let shouldOverride = autoSplitEnabled && prefs.showDaily && (autoIsWarning || apiIsWarning)
         return Effective(
             showDaily: prefs.showDaily && !shouldOverride,
             showAuto: prefs.showAuto || shouldOverride,

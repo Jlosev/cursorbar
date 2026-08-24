@@ -1,4 +1,5 @@
 import Foundation
+import PaceCore
 
 enum CursorAPIError: Error, LocalizedError {
     case notAuthenticated
@@ -80,6 +81,7 @@ struct UsageEventsPage: Decodable, Sendable {
 }
 
 struct UsageEvent: Decodable, Sendable {
+    let model: String?
     let chargedCents: Double?
     let tokenUsage: TokenUsage?
 
@@ -90,6 +92,12 @@ struct UsageEvent: Decodable, Sendable {
     var costCents: Double {
         chargedCents ?? tokenUsage?.totalCents ?? 0
     }
+}
+
+struct TodaySpend: Sendable, Equatable {
+    var totalCents: Int
+    var autoCents: Int
+    var apiCents: Int
 }
 
 enum CursorAPI {
@@ -107,26 +115,27 @@ enum CursorAPI {
         }
     }
 
-    /// Sums the cost of all usage events since local midnight, in cents.
-    static func fetchTodaySpendCents() async throws -> Int {
+    /// Sums usage events since local midnight, split Auto vs API by model.
+    static func fetchTodaySpend() async throws -> TodaySpend {
         var credentials = try TokenProvider.loadSessionCredentials()
 
         do {
-            return try await requestTodaySpendCents(credentials: credentials)
+            return try await requestTodaySpend(credentials: credentials)
         } catch CursorAPIError.notAuthenticated {
             credentials = try TokenProvider.loadSessionCredentials()
-            return try await requestTodaySpendCents(credentials: credentials)
+            return try await requestTodaySpend(credentials: credentials)
         }
     }
 
-    private static func requestTodaySpendCents(credentials: SessionCredentials) async throws -> Int {
+    private static func requestTodaySpend(credentials: SessionCredentials) async throws -> TodaySpend {
         let startOfDay = Calendar.current.startOfDay(for: Date())
         let startMs = String(Int(startOfDay.timeIntervalSince1970 * 1000))
         let endMs = String(Int(Date().timeIntervalSince1970 * 1000))
 
         let pageSize = 100
         let maxPages = 10
-        var totalCents = 0.0
+        var autoCents = 0.0
+        var apiCents = 0.0
         var page = 1
 
         while page <= maxPages {
@@ -137,7 +146,14 @@ enum CursorAPI {
                 page: page,
                 pageSize: pageSize
             )
-            totalCents += result.usageEventsDisplay.reduce(0) { $0 + $1.costCents }
+            for event in result.usageEventsDisplay {
+                switch UsagePoolClassifier.pool(forModel: event.model) {
+                case .auto:
+                    autoCents += event.costCents
+                case .api:
+                    apiCents += event.costCents
+                }
+            }
 
             if page * pageSize >= result.totalUsageEventsCount || result.usageEventsDisplay.isEmpty {
                 break
@@ -145,7 +161,9 @@ enum CursorAPI {
             page += 1
         }
 
-        return Int(totalCents.rounded())
+        let auto = Int(autoCents.rounded())
+        let api = Int(apiCents.rounded())
+        return TodaySpend(totalCents: auto + api, autoCents: auto, apiCents: api)
     }
 
     private static func requestUsageEventsPage(

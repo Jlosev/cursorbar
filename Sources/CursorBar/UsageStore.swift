@@ -214,13 +214,17 @@ final class UsageStore: ObservableObject {
     var todayApiSpendCents: Int? { todaySpend?.apiCents }
 
     var autoDailyUtilizationPercent: Double? {
-        guard let used = todayAutoSpendCents, let budget = autoDailyBudgetCents else { return nil }
-        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: used, dailyBudgetCents: budget)
+        PaceCalculator.dailyUtilizationPercent(
+            spendCents: todayAutoSpendCents,
+            dailyBudgetCents: autoDailyBudgetCents
+        )
     }
 
     var apiDailyUtilizationPercent: Double? {
-        guard let used = todayApiSpendCents, let budget = apiDailyBudgetCents else { return nil }
-        return PaceCalculator.dailyUtilizationPercent(avgDailyCents: used, dailyBudgetCents: budget)
+        PaceCalculator.dailyUtilizationPercent(
+            spendCents: todayApiSpendCents,
+            dailyBudgetCents: apiDailyBudgetCents
+        )
     }
 
     var apiDailyUtilizationPercentForDisplay: Double? {
@@ -318,9 +322,12 @@ final class UsageStore: ObservableObject {
     }
 
     /// Today's spend as a percentage of the daily budget. Can exceed 100%.
+    /// Missing today-spend (events not in yet) is $0 so the Daily bar stays visible.
     var dailyUtilizationPercent: Double? {
-        guard let todaySpendCents, let dailyBudgetCents, dailyBudgetCents > 0 else { return nil }
-        return Double(todaySpendCents) / Double(dailyBudgetCents) * 100.0
+        PaceCalculator.dailyUtilizationPercent(
+            spendCents: todaySpendCents,
+            dailyBudgetCents: dailyBudgetCents
+        )
     }
 
     var dailyStatusColor: Color {

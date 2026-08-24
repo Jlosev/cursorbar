@@ -139,6 +139,22 @@ final class PaceCalculatorTests: XCTestCase {
         XCTAssertEqual(pct!, 0.0, accuracy: 0.01)
     }
 
+    func testDailyUtilization_nilSpendIsZeroPercentWhenBudgetExists() {
+        let pct = PaceCalculator.dailyUtilizationPercent(spendCents: nil, dailyBudgetCents: 2_000)
+        XCTAssertEqual(pct!, 0.0, accuracy: 0.01)
+    }
+
+    func testDailyUtilization_nilBudgetStaysNilEvenWhenSpendIsZero() {
+        XCTAssertNil(PaceCalculator.dailyUtilizationPercent(spendCents: 0, dailyBudgetCents: nil))
+    }
+
+    func testMenuBarBarFill_zeroPercentKeepsFullTrackWidth() {
+        XCTAssertEqual(MenuBarBarFill.width(percent: 0, in: 38), 0)
+        XCTAssertEqual(MenuBarBarFill.width(percent: nil, in: 38), 0)
+        XCTAssertEqual(MenuBarBarFill.width(percent: 50, in: 38), 19, accuracy: 0.01)
+        XCTAssertEqual(MenuBarBarFill.width(percent: 200, in: 38), 38, accuracy: 0.01)
+    }
+
     func testPoolClassifier_firstPartyIsAuto() {
         XCTAssertEqual(UsagePoolClassifier.pool(forModel: "composer-2.5-fast"), .auto)
         XCTAssertEqual(UsagePoolClassifier.pool(forModel: "cursor-grok-4.6-high-fast"), .auto)

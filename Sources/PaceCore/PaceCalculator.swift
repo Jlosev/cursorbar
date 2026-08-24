@@ -65,4 +65,20 @@ public enum PaceCalculator {
         guard dailyBudgetCents > 0 else { return nil }
         return Double(avgDailyCents) / Double(dailyBudgetCents) * 100.0
     }
+
+    /// Today spend vs redistributed budget. Missing spend counts as $0 so a quiet
+    /// morning still shows 0% instead of hiding the daily meters.
+    public static func dailyUtilizationPercent(spendCents: Int?, dailyBudgetCents: Int?) -> Double? {
+        guard let dailyBudgetCents else { return nil }
+        return dailyUtilizationPercent(avgDailyCents: spendCents ?? 0, dailyBudgetCents: dailyBudgetCents)
+    }
+}
+
+/// Pixel width of the colored fill inside a fixed menu-bar gauge. 0% keeps a
+/// full track (width 0 fill) so ImageRenderer still has a laid-out bar.
+public enum MenuBarBarFill {
+    public static func width(percent: Double?, in totalWidth: Double, minimumFilled: Double = 4) -> Double {
+        guard let percent, percent > 0, totalWidth > 0 else { return 0 }
+        return max(totalWidth * min(percent / 100.0, 1), minimumFilled)
+    }
 }

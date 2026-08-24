@@ -77,6 +77,10 @@ enum MenuBarPrefs {
     static let showAutoPaceKey = "menuBarShowAutoPace"
     static let showApiPaceKey = "menuBarShowApiPace"
     static let showDailyKey = "menuBarShowDaily"
+    static let autoSplitDailyKey = "menuBarAutoSplitDaily"
+    /// Hidden dogfood hook — not a Settings toggle. Force Daily→A/P without real spend:
+    /// `defaults write com.cursorbar.app menuBarAutoSplitDebugForce -bool true`
+    static let autoSplitDebugForceKey = "menuBarAutoSplitDebugForce"
     static let showOverspendKey = "menuBarShowOverspend"
     static let showAgentsKey = "menuBarShowAgents"
 }
@@ -86,16 +90,19 @@ private func menuBarSplit(
     store: UsageStore,
     showDaily: Bool,
     showAuto: Bool,
-    showApi: Bool
+    showApi: Bool,
+    autoSplitEnabled: Bool
 ) -> MenuBarSplitPolicy.Effective {
-    MenuBarSplitPolicy.effectiveVisibility(
+    let debugForce = UserDefaults.standard.bool(forKey: MenuBarPrefs.autoSplitDebugForceKey)
+    return MenuBarSplitPolicy.effectiveVisibility(
         prefs: MenuBarSplitPolicy.Prefs(
             showDaily: showDaily,
             showAuto: showAuto,
             showApi: showApi
         ),
-        autoIsWarning: store.autoDailyIsWarning,
-        apiIsWarning: store.apiDailyIsWarning
+        autoIsWarning: store.autoDailyIsWarning || debugForce,
+        apiIsWarning: store.apiDailyIsWarning || debugForce,
+        autoSplitEnabled: autoSplitEnabled
     )
 }
 
@@ -106,6 +113,7 @@ private struct MenuBarLabel: View {
     @AppStorage(MenuBarPrefs.showAutoPaceKey) private var showAutoPace = false
     @AppStorage(MenuBarPrefs.showApiPaceKey) private var showApiPace = false
     @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = true
+    @AppStorage(MenuBarPrefs.autoSplitDailyKey) private var autoSplitDaily = true
     @AppStorage(MenuBarPrefs.showOverspendKey) private var showOverspend = true
     @AppStorage(MenuBarPrefs.showAgentsKey) private var showAgents = true
     @StateObject private var chrome = MenuBarChromeMonitor()
@@ -130,7 +138,8 @@ private struct MenuBarLabel: View {
             store: store,
             showDaily: showDaily,
             showAuto: showAutoPace,
-            showApi: showApiPace
+            showApi: showApiPace,
+            autoSplitEnabled: autoSplitDaily
         )
     }
 
@@ -382,6 +391,7 @@ private struct MenuContentView: View {
     @AppStorage(MenuBarPrefs.showAutoPaceKey) private var showAutoPace = false
     @AppStorage(MenuBarPrefs.showApiPaceKey) private var showApiPace = false
     @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = true
+    @AppStorage(MenuBarPrefs.autoSplitDailyKey) private var autoSplitDaily = true
     @AppStorage(MenuBarPrefs.showOverspendKey) private var showOverspend = true
     @AppStorage(MenuBarPrefs.showAgentsKey) private var showAgents = true
 
@@ -423,7 +433,8 @@ private struct MenuContentView: View {
             store: store,
             showDaily: showDaily,
             showAuto: showAutoPace,
-            showApi: showApiPace
+            showApi: showApiPace,
+            autoSplitEnabled: autoSplitDaily
         )
     }
 
@@ -437,6 +448,7 @@ private struct MenuContentView: View {
             Toggle("Auto daily (A)", isOn: $showAutoPace)
             Toggle("API daily (P)", isOn: $showApiPace)
             Toggle("Daily total (mixed)", isOn: $showDaily)
+            Toggle("Auto-split Daily at 70%", isOn: $autoSplitDaily)
             Toggle("Overspend amount", isOn: $showOverspend)
 
             if split.isOverride {

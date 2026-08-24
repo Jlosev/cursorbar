@@ -239,11 +239,11 @@ final class UsageStore: ObservableObject {
         return nil
     }
 
-    /// Same thresholds as mixed daily: >100 red, ≥70 yellow.
+    /// Same thresholds as mixed daily: >100 red, ≥ warning yellow.
     static func poolDailyStatusColor(for percent: Double?) -> Color {
         guard let percent else { return .secondary }
         if percent > 100 { return .red }
-        if percent >= 70 { return .yellow }
+        if percent >= MenuBarSplitPolicy.warningThreshold { return .yellow }
         return .green
     }
 
@@ -255,6 +255,26 @@ final class UsageStore: ObservableObject {
     var apiDailyStatusColor: Color {
         if Self.isDepletedPoolWithBurn(budgetCents: apiDailyBudgetCents, spendCents: todayApiSpendCents) { return .red }
         return Self.poolDailyStatusColor(for: apiDailyUtilizationPercent)
+    }
+
+    var autoDailyIsWarning: Bool {
+        MenuBarSplitPolicy.isPoolWarning(
+            percent: autoDailyUtilizationPercent,
+            depleted: Self.isDepletedPoolWithBurn(
+                budgetCents: autoDailyBudgetCents,
+                spendCents: todayAutoSpendCents
+            )
+        )
+    }
+
+    var apiDailyIsWarning: Bool {
+        MenuBarSplitPolicy.isPoolWarning(
+            percent: apiDailyUtilizationPercent,
+            depleted: Self.isDepletedPoolWithBurn(
+                budgetCents: apiDailyBudgetCents,
+                spendCents: todayApiSpendCents
+            )
+        )
     }
 
     func dailyFootnote(poolLabel: String, remainingCents: Int?, budgetCents: Int?) -> String? {
@@ -313,7 +333,7 @@ final class UsageStore: ObservableObject {
     var dailyStatusColor: Color {
         guard let dailyUtilizationPercent else { return .secondary }
         if dailyUtilizationPercent > 100 { return .red }
-        if dailyUtilizationPercent >= 70 { return .yellow }
+        if dailyUtilizationPercent >= MenuBarSplitPolicy.warningThreshold { return .yellow }
         return .green
     }
 

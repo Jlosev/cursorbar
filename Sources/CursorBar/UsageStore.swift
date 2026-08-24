@@ -262,7 +262,7 @@ final class UsageStore: ObservableObject {
             percent: autoDailyUtilizationPercent,
             depleted: Self.isDepletedPoolWithBurn(
                 budgetCents: autoDailyBudgetCents,
-                avgDailyCents: autoAvgDailyCents
+                spendCents: todayAutoSpendCents
             )
         )
     }
@@ -272,7 +272,7 @@ final class UsageStore: ObservableObject {
             percent: apiDailyUtilizationPercent,
             depleted: Self.isDepletedPoolWithBurn(
                 budgetCents: apiDailyBudgetCents,
-                avgDailyCents: apiAvgDailyCents
+                spendCents: todayApiSpendCents
             )
         )
     }

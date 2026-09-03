@@ -595,6 +595,8 @@ private struct MenuContentView: View {
                         title: "Cursor Models",
                         percent: cursorModelsPercent,
                         color: store.cursorModelsStatusColor,
+                        usedCents: store.cursorModelsUsedCreditsCents,
+                        limitCents: store.cursorModelsLimitCreditsCents,
                         indented: true
                     )
                 }

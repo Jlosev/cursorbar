@@ -185,4 +185,62 @@ final class PaceCalculatorTests: XCTestCase {
             date(2026, 8, 15)
         )
     }
+
+    func testTodaySpendWindow_usesMidnightWhenCycleStartedEarlier() {
+        let now = utc.date(from: DateComponents(year: 2026, month: 9, day: 10, hour: 15))!
+        let cycleStart = utc.date(from: DateComponents(year: 2026, month: 9, day: 3, hour: 13, minute: 22, second: 40))!
+        XCTAssertEqual(
+            PaceCalculator.todaySpendWindowStart(now: now, cycleStart: cycleStart, calendar: utc),
+            date(2026, 9, 10)
+        )
+    }
+
+    func testTodaySpendWindow_clipsToCycleStartOnResetDay() {
+        // Cycle reset mid-afternoon; morning events billed on the previous subscription.
+        let now = utc.date(from: DateComponents(year: 2026, month: 9, day: 3, hour: 16, minute: 42))!
+        let cycleStart = utc.date(from: DateComponents(year: 2026, month: 9, day: 3, hour: 13, minute: 22, second: 40))!
+        XCTAssertEqual(
+            PaceCalculator.todaySpendWindowStart(now: now, cycleStart: cycleStart, calendar: utc),
+            cycleStart
+        )
+    }
+
+    func testTodaySpendWindow_midnightWhenCycleStartMissing() {
+        let now = utc.date(from: DateComponents(year: 2026, month: 9, day: 3, hour: 16))!
+        XCTAssertEqual(
+            PaceCalculator.todaySpendWindowStart(now: now, cycleStart: nil, calendar: utc),
+            date(2026, 9, 3)
+        )
+    }
+
+    func testIsCycleStartDay_trueOnResetCalendarDay() {
+        let now = utc.date(from: DateComponents(year: 2026, month: 9, day: 3, hour: 18))!
+        let cycleStart = utc.date(from: DateComponents(year: 2026, month: 9, day: 3, hour: 13, minute: 22))!
+        XCTAssertTrue(PaceCalculator.isCycleStartDay(now: now, cycleStart: cycleStart, calendar: utc))
+    }
+
+    func testIsCycleStartDay_falseOnLaterDay() {
+        let now = utc.date(from: DateComponents(year: 2026, month: 9, day: 4, hour: 10))!
+        let cycleStart = utc.date(from: DateComponents(year: 2026, month: 9, day: 3, hour: 13, minute: 22))!
+        XCTAssertFalse(PaceCalculator.isCycleStartDay(now: now, cycleStart: cycleStart, calendar: utc))
+    }
+
+    func testScalePoolCents_dayOneMatchesIncludedTotal() {
+        // Events 1435 + 530 = 1965.14 rounded separately can drift; snap to included 1965.
+        let scaled = PaceCalculator.scalePoolCents(autoCents: 1_435, apiCents: 531, toTotal: 1_965)
+        XCTAssertEqual(scaled.auto + scaled.api, 1_965)
+        XCTAssertEqual(scaled.auto, 1_434)
+        XCTAssertEqual(scaled.api, 531)
+    }
+
+    func testScalePoolCents_identityWhenAlreadyEqual() {
+        let scaled = PaceCalculator.scalePoolCents(autoCents: 1_446, apiCents: 848, toTotal: 2_294)
+        XCTAssertEqual(scaled.auto, 1_446)
+        XCTAssertEqual(scaled.api, 848)
+    }
+
+    func testCursorUsed_isIncludedMinusOther() {
+        XCTAssertEqual(PaceCalculator.cursorModelsUsedCents(includedUsed: 2_294, otherUsed: 848), 1_446)
+        XCTAssertEqual(PaceCalculator.cursorModelsUsedCents(includedUsed: 100, otherUsed: 150), 0)
+    }
 }

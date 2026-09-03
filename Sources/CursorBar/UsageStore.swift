@@ -32,7 +32,31 @@ final class UsageStore: ObservableObject {
         }
 
         // Daily spend is supplementary; failures here must not break the main display.
-        todaySpend = try? await CursorAPI.fetchTodaySpend()
+        todaySpend = try? await CursorAPI.fetchTodaySpend(cycleStart: billingCycleStartDate)
+        if PaceCalculator.isCycleStartDay(now: Date(), cycleStart: billingCycleStartDate),
+           let includedUsed = includedUsedCreditsCents
+        {
+            if let spend = todaySpend, spend.totalCents > 0 {
+                let scaled = PaceCalculator.scalePoolCents(
+                    autoCents: spend.autoCents,
+                    apiCents: spend.apiCents,
+                    toTotal: includedUsed
+                )
+                todaySpend = TodaySpend(totalCents: includedUsed, autoCents: scaled.auto, apiCents: scaled.api)
+            } else if let otherUsed = otherModelsUsedCreditsCents {
+                let autoUsed = PaceCalculator.cursorModelsUsedCents(
+                    includedUsed: includedUsed,
+                    otherUsed: otherUsed
+                )
+                todaySpend = TodaySpend(
+                    totalCents: includedUsed,
+                    autoCents: autoUsed,
+                    apiCents: min(otherUsed, includedUsed)
+                )
+            } else {
+                todaySpend = TodaySpend(totalCents: includedUsed, autoCents: includedUsed, apiCents: 0)
+            }
+        }
     }
 
     /// Plain-text fallback for the menu bar while data is unavailable.
@@ -81,7 +105,7 @@ final class UsageStore: ObservableObject {
         includedPercentUsed ?? cursorModelsPercentUsed ?? otherModelsPercentUsed
     }
 
-    /// Cursor Models pool (Auto, Composer, Cursor Grok). Percent only — the API has no dollar cap for this pool.
+    /// Cursor Models pool (Auto, Composer, Cursor Grok). Dollar cap is derived for individual plans.
     var cursorModelsPercentUsed: Double? {
         summary?.cursorModelsPercentUsed
     }
@@ -123,6 +147,9 @@ final class UsageStore: ObservableObject {
     }
 
     var cursorModelsUsedCreditsCents: Int? {
+        if let included = includedUsedCreditsCents, let other = otherModelsUsedCreditsCents {
+            return PaceCalculator.cursorModelsUsedCents(includedUsed: included, otherUsed: other)
+        }
         guard let limit = cursorModelsLimitCreditsCents, let percent = cursorModelsPercentUsed else { return nil }
         return Int((Double(limit) * percent / 100.0).rounded())
     }

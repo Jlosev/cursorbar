@@ -72,6 +72,43 @@ public enum PaceCalculator {
         guard let dailyBudgetCents else { return nil }
         return dailyUtilizationPercent(avgDailyCents: spendCents ?? 0, dailyBudgetCents: dailyBudgetCents)
     }
+
+    /// Events window for Daily: local midnight, or cycle start if the subscription
+    /// reset later the same calendar day (morning burn belongs to the old cycle).
+    public static func todaySpendWindowStart(
+        now: Date,
+        cycleStart: Date?,
+        calendar: Calendar = .current
+    ) -> Date {
+        let midnight = calendar.startOfDay(for: now)
+        guard let cycleStart else { return midnight }
+        return max(midnight, cycleStart)
+    }
+
+    /// First calendar day of the billing cycle — Daily used must match included used.
+    public static func isCycleStartDay(
+        now: Date,
+        cycleStart: Date?,
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard let cycleStart else { return false }
+        return calendar.isDate(now, inSameDayAs: cycleStart)
+    }
+
+    /// Scale Auto/API cents so they sum to `target` (included used on day one).
+    public static func scalePoolCents(autoCents: Int, apiCents: Int, toTotal target: Int) -> (auto: Int, api: Int) {
+        let target = max(target, 0)
+        let raw = autoCents + apiCents
+        guard raw > 0 else { return (target, 0) }
+        let auto = Int((Double(autoCents) * Double(target) / Double(raw)).rounded())
+        let clampedAuto = min(max(auto, 0), target)
+        return (clampedAuto, target - clampedAuto)
+    }
+
+    /// Cursor Models used is the remainder of included after Other Models, not `% × invented cap`.
+    public static func cursorModelsUsedCents(includedUsed: Int, otherUsed: Int) -> Int {
+        max(includedUsed - otherUsed, 0)
+    }
 }
 
 /// Pixel width of the colored fill inside a fixed menu-bar gauge. 0% keeps a

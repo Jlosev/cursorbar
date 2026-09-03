@@ -115,21 +115,26 @@ enum CursorAPI {
         }
     }
 
-    /// Sums usage events since local midnight, split Auto vs API by model.
-    static func fetchTodaySpend() async throws -> TodaySpend {
+    /// Sums usage events in today's Daily window, split Auto vs API by model.
+    /// Window starts at local midnight, or at `cycleStart` when the billing cycle
+    /// reset later the same calendar day.
+    static func fetchTodaySpend(cycleStart: Date? = nil) async throws -> TodaySpend {
         var credentials = try TokenProvider.loadSessionCredentials()
 
         do {
-            return try await requestTodaySpend(credentials: credentials)
+            return try await requestTodaySpend(credentials: credentials, cycleStart: cycleStart)
         } catch CursorAPIError.notAuthenticated {
             credentials = try TokenProvider.loadSessionCredentials()
-            return try await requestTodaySpend(credentials: credentials)
+            return try await requestTodaySpend(credentials: credentials, cycleStart: cycleStart)
         }
     }
 
-    private static func requestTodaySpend(credentials: SessionCredentials) async throws -> TodaySpend {
-        let startOfDay = Calendar.current.startOfDay(for: Date())
-        let startMs = String(Int(startOfDay.timeIntervalSince1970 * 1000))
+    private static func requestTodaySpend(
+        credentials: SessionCredentials,
+        cycleStart: Date?
+    ) async throws -> TodaySpend {
+        let windowStart = PaceCalculator.todaySpendWindowStart(now: Date(), cycleStart: cycleStart)
+        let startMs = String(Int(windowStart.timeIntervalSince1970 * 1000))
         let endMs = String(Int(Date().timeIntervalSince1970 * 1000))
 
         let pageSize = 100

@@ -107,21 +107,35 @@ enum CursorAPI {
         }
     }
 
-    /// Sums the cost of all usage events since local midnight, in cents.
-    static func fetchTodaySpendCents() async throws -> Int {
+    /// Sums usage-event cost for today's Daily window, in cents.
+    /// Starts at local midnight, or at `cycleStart` when the billing cycle reset later the same day.
+    static func fetchTodaySpendCents(cycleStart: Date? = nil) async throws -> Int {
         var credentials = try TokenProvider.loadSessionCredentials()
 
         do {
-            return try await requestTodaySpendCents(credentials: credentials)
+            return try await requestTodaySpendCents(credentials: credentials, cycleStart: cycleStart)
         } catch CursorAPIError.notAuthenticated {
             credentials = try TokenProvider.loadSessionCredentials()
-            return try await requestTodaySpendCents(credentials: credentials)
+            return try await requestTodaySpendCents(credentials: credentials, cycleStart: cycleStart)
         }
     }
 
-    private static func requestTodaySpendCents(credentials: SessionCredentials) async throws -> Int {
-        let startOfDay = Calendar.current.startOfDay(for: Date())
-        let startMs = String(Int(startOfDay.timeIntervalSince1970 * 1000))
+    private static func todaySpendWindowStart(
+        now: Date = Date(),
+        cycleStart: Date?,
+        calendar: Calendar = .current
+    ) -> Date {
+        let midnight = calendar.startOfDay(for: now)
+        guard let cycleStart else { return midnight }
+        return max(midnight, cycleStart)
+    }
+
+    private static func requestTodaySpendCents(
+        credentials: SessionCredentials,
+        cycleStart: Date?
+    ) async throws -> Int {
+        let windowStart = todaySpendWindowStart(cycleStart: cycleStart)
+        let startMs = String(Int(windowStart.timeIntervalSince1970 * 1000))
         let endMs = String(Int(Date().timeIntervalSince1970 * 1000))
 
         let pageSize = 100

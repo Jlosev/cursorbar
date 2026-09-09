@@ -32,7 +32,18 @@ final class UsageStore: ObservableObject {
         }
 
         // Daily spend is supplementary; failures here must not break the main display.
-        todaySpend = try? await CursorAPI.fetchTodaySpend()
+        todaySpend = try? await CursorAPI.fetchTodaySpend(cycleStart: billingCycleStartDate)
+        if let cycleStart = billingCycleStartDate,
+           Calendar.current.isDate(Date(), inSameDayAs: cycleStart),
+           let includedUsed = includedUsedCreditsCents
+        {
+            let split = todaySpend
+            todaySpend = TodaySpend(
+                totalCents: includedUsed,
+                autoCents: split?.autoCents ?? 0,
+                apiCents: split?.apiCents ?? 0
+            )
+        }
     }
 
     /// Plain-text fallback for the menu bar while data is unavailable.

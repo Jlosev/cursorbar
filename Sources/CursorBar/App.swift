@@ -84,8 +84,10 @@ private struct MenuBarLabel: View {
     @AppStorage(MenuBarPrefs.showDailyKey) private var showDaily = true
     @AppStorage(MenuBarPrefs.showOverspendKey) private var showOverspend = true
     @AppStorage(MenuBarPrefs.showAgentsKey) private var showAgents = true
+    @StateObject private var chrome = MenuBarChromeMonitor()
 
     var body: some View {
+        let _ = chrome.isDark
         if store.summary == nil {
             Text(store.menuBarLabel)
                 .monospacedDigit()
@@ -104,7 +106,7 @@ private struct MenuBarLabel: View {
     }
 
     private var renderedImage: NSImage? {
-        let isDark = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        let isDark = MenuBarChromeMonitor.resolve(app: NSApp)
 
         let content = HStack(spacing: 8) {
             if showAgents {

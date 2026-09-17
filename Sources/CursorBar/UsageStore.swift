@@ -150,8 +150,9 @@ final class UsageStore: ObservableObject {
         return max(used - limit, 0)
     }
 
+    /// Included overage plus any on-demand charges, even if on-demand is now disabled.
     var overspendCents: Int {
-        includedOverageCents + (onDemandEnabled ? onDemandUsedCents : 0)
+        includedOverageCents + onDemandUsedCents
     }
 
     var hasOverspend: Bool {

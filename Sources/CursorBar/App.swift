@@ -25,8 +25,7 @@ enum CursorBarMain {
                 let used = Double(summary.includedUsedCents ?? 0)
                 let pool = Double(summary.includedLimitCents ?? 0)
                 let overage = pool > 0 ? max(used - pool, 0) : 0
-                let onDemand = summary.resolvedOnDemand
-                let onDemandUsed = onDemand?.isEnabled == true ? Double(onDemand?.usedCents ?? 0) : 0
+                let onDemandUsed = Double(summary.resolvedOnDemand?.usedCents ?? 0)
                 let overspend = overage + onDemandUsed
                 let percent = min(summary.includedPercentUsed ?? 0, 100)
                 if overspend > 0 {
@@ -564,7 +563,7 @@ private struct MenuContentView: View {
                     .font(.caption)
                 }
 
-                if store.onDemandEnabled, store.onDemandUsedCents > 0 {
+                if store.onDemandUsedCents > 0 {
                     HStack {
                         Text("On-demand")
                             .foregroundStyle(.secondary)

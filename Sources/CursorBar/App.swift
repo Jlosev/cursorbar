@@ -33,6 +33,9 @@ enum CursorBarMain {
                 } else {
                     print(String(format: "OK %.0f%%", percent))
                 }
+                if let tokens = try? await CursorAPI.fetchPublicProfileTokens(periodStart: summary.billingCycleStart.flatMap(Self.parseISO8601)) {
+                    print("TOKENS cycle=\(tokens.periodTokens) all=\(tokens.totalTokens) @\(tokens.handle)")
+                }
                 exit(0)
             } catch {
                 fputs("ERROR: \(error.localizedDescription)\n", stderr)
@@ -40,6 +43,14 @@ enum CursorBarMain {
             }
         }
         group.wait()
+    }
+
+    private static func parseISO8601(_ value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
     }
 }
 
@@ -262,6 +273,21 @@ private struct MenuBarBarGauge: View {
         }
         .frame(width: 38, height: 16)
         .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+}
+
+private struct TokenCountRow: View {
+    let title: String
+    let count: Int
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.caption.weight(.medium))
+            Spacer()
+            Text(UsageStore.formatTokens(count))
+                .font(.caption.monospacedDigit())
+        }
     }
 }
 
@@ -540,6 +566,14 @@ private struct MenuContentView: View {
             )
         }
 
+        if store.hasTokenTotals, hasBillingMeters || store.dailyUtilizationPercent != nil {
+            Divider()
+        }
+
+        if store.hasTokenTotals {
+            tokensSection
+        }
+
         if store.hasOverspend {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -624,6 +658,27 @@ private struct MenuContentView: View {
                 .font(.caption)
                 .foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var tokensSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Tokens")
+                .font(.subheadline.weight(.medium))
+
+            if let periodTokenCount = store.periodTokenCount {
+                TokenCountRow(title: "This cycle", count: periodTokenCount)
+            }
+
+            if let lifetimeTokenCount = store.lifetimeTokenCount {
+                TokenCountRow(title: "All time", count: lifetimeTokenCount)
+            }
+
+            if let handle = store.profileHandle {
+                Text("From cursor.com/@\(handle)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

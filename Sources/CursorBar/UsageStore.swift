@@ -5,6 +5,9 @@ import SwiftUI
 final class UsageStore: ObservableObject {
     @Published private(set) var summary: UsageSummary?
     @Published private(set) var todaySpendCents: Int?
+    @Published private(set) var periodTokenCount: Int?
+    @Published private(set) var lifetimeTokenCount: Int?
+    @Published private(set) var profileHandle: String?
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
@@ -30,14 +33,28 @@ final class UsageStore: ObservableObject {
             errorMessage = error.localizedDescription
         }
 
-        // Daily spend is supplementary; failures here must not break the main display.
-        todaySpendCents = try? await CursorAPI.fetchTodaySpendCents(cycleStart: billingCycleStartDate)
-        if let cycleStart = billingCycleStartDate,
+        // Daily spend and profile tokens are supplementary; failures must not break the main display.
+        let cycleStart = billingCycleStartDate
+        async let todaySpendResult: Int? = try? await CursorAPI.fetchTodaySpendCents(cycleStart: cycleStart)
+        async let profileTokensResult: PublicProfileTokens? = try? await CursorAPI.fetchPublicProfileTokens(periodStart: cycleStart)
+
+        todaySpendCents = await todaySpendResult
+        if let cycleStart,
            Calendar.current.isDate(Date(), inSameDayAs: cycleStart),
            let includedUsed = includedUsedCreditsCents
         {
             todaySpendCents = includedUsed
         }
+
+        if let profileTokens = await profileTokensResult {
+            profileHandle = profileTokens.handle
+            periodTokenCount = profileTokens.periodTokens
+            lifetimeTokenCount = profileTokens.totalTokens
+        }
+    }
+
+    var hasTokenTotals: Bool {
+        periodTokenCount != nil || lifetimeTokenCount != nil
     }
 
     /// Plain-text fallback for the menu bar while data is unavailable.
@@ -227,6 +244,22 @@ final class UsageStore: ObservableObject {
     static func formatDollars(cents: Int) -> String {
         let dollars = Double(cents) / 100.0
         return currencyFormatter.string(from: NSNumber(value: dollars)) ?? String(format: "$%.2f", dollars)
+    }
+
+    static func formatTokens(_ count: Int) -> String {
+        let sign = count < 0 ? "-" : ""
+        let value = abs(count)
+        if value >= 1_000_000_000 {
+            let billions = Double(value) / 1_000_000_000.0
+            return sign + String(format: billions >= 10 ? "%.1fB" : "%.2fB", billions)
+        }
+        if value >= 1_000_000 {
+            return sign + String(format: "%.1fM", Double(value) / 1_000_000.0)
+        }
+        if value >= 1_000 {
+            return sign + String(format: "%.1fK", Double(value) / 1_000.0)
+        }
+        return sign + "\(value)"
     }
 
     /// Whole-dollar amount for the compact menu bar label.

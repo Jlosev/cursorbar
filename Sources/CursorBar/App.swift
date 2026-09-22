@@ -137,7 +137,7 @@ private struct MenuBarLabel: View {
                     percent: store.autoDailyUtilizationPercentForDisplay,
                     fillColor: store.autoDailyStatusColor,
                     isDark: isDark,
-                    prefix: "A"
+                    prefix: "CM"
                 )
             }
             if showApiPace {
@@ -145,7 +145,7 @@ private struct MenuBarLabel: View {
                     percent: store.apiDailyUtilizationPercentForDisplay,
                     fillColor: store.apiDailyStatusColor,
                     isDark: isDark,
-                    prefix: "P"
+                    prefix: "OM"
                 )
             }
             if showDaily {
@@ -272,18 +272,18 @@ private struct MenuBarBarGauge: View {
             body = "–"
         }
         if let prefix {
-            return "\(prefix)\(body)"
+            return "\(prefix) \(body)"
         }
         return body
     }
 
     private var width: CGFloat {
-        prefix == nil ? 38 : 46
+        prefix == nil ? 38 : 56
     }
 
     var body: some View {
         // No GeometryReader: ImageRenderer gives it a zero proposed size, so a
-        // 0% fill made the whole Daily/A/P strip collapse.
+        // 0% fill made the whole Daily/CM/OM strip collapse.
         ZStack {
             RoundedRectangle(cornerRadius: 4)
                 .fill(trackColor)
@@ -397,8 +397,8 @@ private struct MenuContentView: View {
 
             Toggle("Agents badge", isOn: $showAgents)
             Toggle("Quota gauge", isOn: $showQuota)
-            Toggle("Auto daily (A)", isOn: $showAutoPace)
-            Toggle("API daily (P)", isOn: $showApiPace)
+            Toggle("Cursor Models daily (CM)", isOn: $showAutoPace)
+            Toggle("Other Models daily (OM)", isOn: $showApiPace)
             Toggle("Daily total (mixed)", isOn: $showDaily)
             Toggle("Overspend amount", isOn: $showOverspend)
         }
@@ -578,7 +578,7 @@ private struct MenuContentView: View {
 
                 if let autoPct = store.autoDailyUtilizationPercentForDisplay {
                     UsageMeterView(
-                        title: "Auto daily",
+                        title: "Cursor Models",
                         percent: autoPct,
                         color: store.autoDailyStatusColor,
                         usedCents: store.todayAutoSpendCents,
@@ -589,7 +589,7 @@ private struct MenuContentView: View {
 
                 if let apiPct = store.apiDailyUtilizationPercentForDisplay {
                     UsageMeterView(
-                        title: "API daily",
+                        title: "Other Models",
                         percent: apiPct,
                         color: store.apiDailyStatusColor,
                         usedCents: store.todayApiSpendCents,

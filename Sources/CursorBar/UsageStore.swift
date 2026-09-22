@@ -6,6 +6,9 @@ import PaceCore
 final class UsageStore: ObservableObject {
     @Published private(set) var summary: UsageSummary?
     @Published private(set) var todaySpend: TodaySpend?
+    @Published private(set) var periodTokenCount: Int?
+    @Published private(set) var lifetimeTokenCount: Int?
+    @Published private(set) var profileHandle: String?
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
@@ -31,7 +34,7 @@ final class UsageStore: ObservableObject {
             errorMessage = error.localizedDescription
         }
 
-        // Daily spend is supplementary; failures here must not break the main display.
+        // Daily spend and profile tokens are supplementary; failures must not break the main display.
         todaySpend = try? await CursorAPI.fetchTodaySpend(cycleStart: billingCycleStartDate)
         if PaceCalculator.isCycleStartDay(now: Date(), cycleStart: billingCycleStartDate),
            let includedUsed = includedUsedCreditsCents
@@ -57,6 +60,16 @@ final class UsageStore: ObservableObject {
                 todaySpend = TodaySpend(totalCents: includedUsed, autoCents: includedUsed, apiCents: 0)
             }
         }
+
+        if let profileTokens = try? await CursorAPI.fetchPublicProfileTokens(periodStart: billingCycleStartDate) {
+            profileHandle = profileTokens.handle
+            periodTokenCount = profileTokens.periodTokens
+            lifetimeTokenCount = profileTokens.totalTokens
+        }
+    }
+
+    var hasTokenTotals: Bool {
+        periodTokenCount != nil || lifetimeTokenCount != nil
     }
 
     /// Plain-text fallback for the menu bar while data is unavailable.
@@ -200,8 +213,9 @@ final class UsageStore: ObservableObject {
         return max(used - limit, 0)
     }
 
+    /// Included overage plus any on-demand charges, even if on-demand is now disabled.
     var overspendCents: Int {
-        includedOverageCents + (onDemandEnabled ? onDemandUsedCents : 0)
+        includedOverageCents + onDemandUsedCents
     }
 
     var hasOverspend: Bool {
@@ -396,6 +410,22 @@ final class UsageStore: ObservableObject {
     static func formatDollars(cents: Int) -> String {
         let dollars = Double(cents) / 100.0
         return currencyFormatter.string(from: NSNumber(value: dollars)) ?? String(format: "$%.2f", dollars)
+    }
+
+    static func formatTokens(_ count: Int) -> String {
+        let sign = count < 0 ? "-" : ""
+        let value = abs(count)
+        if value >= 1_000_000_000 {
+            let billions = Double(value) / 1_000_000_000.0
+            return sign + String(format: billions >= 10 ? "%.1fB" : "%.2fB", billions)
+        }
+        if value >= 1_000_000 {
+            return sign + String(format: "%.1fM", Double(value) / 1_000_000.0)
+        }
+        if value >= 1_000 {
+            return sign + String(format: "%.1fK", Double(value) / 1_000.0)
+        }
+        return sign + "\(value)"
     }
 
     /// Whole-dollar amount for the compact menu bar label.

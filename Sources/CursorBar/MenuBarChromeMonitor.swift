@@ -1,6 +1,5 @@
 import AppKit
 import Combine
-import PaceCore
 
 @MainActor
 final class MenuBarChromeMonitor: ObservableObject {

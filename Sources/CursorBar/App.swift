@@ -26,14 +26,16 @@ enum CursorBarMain {
                 let used = Double(summary.includedUsedCents ?? 0)
                 let pool = Double(summary.includedLimitCents ?? 0)
                 let overage = pool > 0 ? max(used - pool, 0) : 0
-                let onDemand = summary.resolvedOnDemand
-                let onDemandUsed = onDemand?.isEnabled == true ? Double(onDemand?.usedCents ?? 0) : 0
+                let onDemandUsed = Double(summary.resolvedOnDemand?.usedCents ?? 0)
                 let overspend = overage + onDemandUsed
                 let percent = min(summary.includedPercentUsed ?? 0, 100)
                 if overspend > 0 {
                     print(String(format: "OK %.0f%% (overspend $%.2f)", percent, overspend / 100.0))
                 } else {
                     print(String(format: "OK %.0f%%", percent))
+                }
+                if let tokens = try? await CursorAPI.fetchPublicProfileTokens(periodStart: summary.billingCycleStart.flatMap(Self.parseISO8601)) {
+                    print("TOKENS cycle=\(tokens.periodTokens) all=\(tokens.totalTokens) @\(tokens.handle)")
                 }
                 exit(0)
             } catch {
@@ -42,6 +44,14 @@ enum CursorBarMain {
             }
         }
         group.wait()
+    }
+
+    private static func parseISO8601(_ value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) { return date }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: value)
     }
 }
 
@@ -303,6 +313,21 @@ private struct MenuBarBarGauge: View {
         }
         .frame(width: width, height: 16)
         .clipShape(RoundedRectangle(cornerRadius: 4))
+    }
+}
+
+private struct TokenCountRow: View {
+    let title: String
+    let count: Int
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.caption.weight(.medium))
+            Spacer()
+            Text(UsageStore.formatTokens(count))
+                .font(.caption.monospacedDigit())
+        }
     }
 }
 
@@ -600,6 +625,14 @@ private struct MenuContentView: View {
             }
         }
 
+        if store.hasTokenTotals, hasIncludedBlock || hasDailyBlock {
+            Divider()
+        }
+
+        if store.hasTokenTotals {
+            tokensSection
+        }
+
         if store.hasOverspend {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -623,7 +656,7 @@ private struct MenuContentView: View {
                     .font(.caption)
                 }
 
-                if store.onDemandEnabled, store.onDemandUsedCents > 0 {
+                if store.onDemandUsedCents > 0 {
                     HStack {
                         Text("On-demand")
                             .foregroundStyle(.secondary)
@@ -684,6 +717,27 @@ private struct MenuContentView: View {
                 .font(.caption)
                 .foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var tokensSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Tokens")
+                .font(.subheadline.weight(.medium))
+
+            if let periodTokenCount = store.periodTokenCount {
+                TokenCountRow(title: "This cycle", count: periodTokenCount)
+            }
+
+            if let lifetimeTokenCount = store.lifetimeTokenCount {
+                TokenCountRow(title: "All time", count: lifetimeTokenCount)
+            }
+
+            if let handle = store.profileHandle {
+                Text("From cursor.com/@\(handle)")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 

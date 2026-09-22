@@ -158,6 +158,9 @@ final class PaceCalculatorTests: XCTestCase {
     func testPoolClassifier_firstPartyIsAuto() {
         XCTAssertEqual(UsagePoolClassifier.pool(forModel: "composer-2.5-fast"), .auto)
         XCTAssertEqual(UsagePoolClassifier.pool(forModel: "cursor-grok-4.6-high-fast"), .auto)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "grok-4.7-high"), .auto)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "grok-4.7-high-fast"), .auto)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "grok-4.7-xhigh"), .auto)
         XCTAssertEqual(UsagePoolClassifier.pool(forModel: "default"), .auto)
         XCTAssertEqual(UsagePoolClassifier.pool(forModel: "auto"), .auto)
     }

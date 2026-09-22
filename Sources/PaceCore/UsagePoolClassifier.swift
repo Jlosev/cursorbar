@@ -7,7 +7,8 @@ public enum UsagePool: Sendable, Equatable {
 
 /// Maps a Cursor usage-event `model` to Auto vs API.
 /// Probe 2026-08-21: events have no pool tag (`kind` is always included-in-plan).
-/// Auto = first-party (`composer*`, `cursor-*`, `default`, `auto*`); else named API.
+/// Auto = first-party Cursor Models pool: `composer*`, `cursor-*` (Grok 4.5/4.6),
+/// `grok*` (Grok 4.7 dropped the `cursor-` prefix), `default`, `auto*`. Else named API.
 public enum UsagePoolClassifier {
     public static func pool(forModel model: String?) -> UsagePool {
         let name = (model ?? "")
@@ -15,6 +16,7 @@ public enum UsagePoolClassifier {
             .lowercased()
         if name.hasPrefix("composer")
             || name.hasPrefix("cursor-")
+            || name.hasPrefix("grok")
             || name == "default"
             || name.hasPrefix("auto")
         {

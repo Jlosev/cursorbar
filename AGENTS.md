@@ -1,6 +1,6 @@
 ---
 created: 2026-08-07
-updated: 2026-08-21
+updated: 2026-09-22
 ---
 
 # AGENTS.md – cursorbar-pace
@@ -12,7 +12,7 @@ updated: 2026-08-21
 
 ## CONSTRAINTS
 
-**CRITICAL:** Code lives in this repo (`~/Documents/03_Projects/cursorbar-pace`); never treat Obsidian vault checkout as the code root.
+**CRITICAL:** Code lives in this repo (`~/Projects/cursorbar-pace`); never treat Obsidian vault checkout as the code root.
 **CRITICAL:** Product name is `cursorbar-pace` (fork of CursorBar). Soft-diverge from upstream `c-johannesen/cursorbar` (MIT).
 **MANDATORY:** Durable product/requirements truth → `@docs/` (symlink into vault).
 **MANDATORY:** Active spec = nested dropdown (Included = Auto/API **monthly pool %**; Daily = Auto/API **today $** vs `remaining ÷ remaining workdays`) + menu bar A/P = same daily — `@docs/Specs/2026-08-20 – Redistributing daily.md`. Today split = events + model rule in that spec. Menu bar quiet default = Daily total; auto-splits to A/P when a daily pool is ≥70% — `@docs/Specs/2026-08-21 – Auto-split daily warning.md`.
@@ -37,7 +37,7 @@ macOS menu bar fork of [c-johannesen/cursorbar](https://github.com/c-johannesen/
 - Keep `docs/` as a **relative** symlink to vault (no hardcoded `/Users/<name>/…`). Recovery from repo root:
 
 ```bash
-ln -sfn "../../../Library/Mobile Documents/iCloud~md~obsidian/Documents/Evgeniy Losev DB/03_Проекты/Идеи/CursorBar Pace" docs
+ln -sfn "../../Library/Mobile Documents/iCloud~md~obsidian/Documents/Evgeniy Losev DB/03_Проекты/Идеи/CursorBar Pace" docs
 ```
 
 - Do not commit vault contents via `docs/` (`/docs` is gitignored).
@@ -68,7 +68,7 @@ ln -sfn "../../../Library/Mobile Documents/iCloud~md~obsidian/Documents/Evgeniy 
 ## Связанные правила
 
 - User AGENTS.md core rule – bootstrap/enrich protocol
-- Methodology twin: `~/Documents/03_Projects/skillgraph` (docs symlink pattern)
+- Methodology twin: `~/Projects/skillgraph` (docs symlink pattern)
 
 ---
-updated: 2026-08-21
+updated: 2026-09-22

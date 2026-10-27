@@ -468,9 +468,24 @@ private struct MenuContentView: View {
         }
         .onPreferenceChange(PanelHeightKey.self) { panelHeight = $0 }
         .background(MenuBarPanelSizer(height: panelHeight))
-        .onAppear {
+        .task(id: loginStatusWatch) {
+            refreshOpenAtLogin()
+            guard loginStatusWatch else { return }
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                refreshOpenAtLogin()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             refreshOpenAtLogin()
         }
+    }
+
+    /// Keep the login toggle current while the menu stays open and the user
+    /// approves CursorBar in System Settings.
+    private var loginStatusWatch: Bool {
+        openAtLoginNotice != nil || showSettings
     }
 
     private var openAtLoginNoticeSection: some View {

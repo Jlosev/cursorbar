@@ -40,11 +40,15 @@ final class UsageStore: ObservableObject {
            Calendar.current.isDate(Date(), inSameDayAs: cycleStart),
            let includedUsed = includedUsedCreditsCents
         {
-            let split = todaySpend
+            let reconciled = CycleStartSpend.reconcile(
+                autoCents: todaySpend?.autoCents ?? 0,
+                apiCents: todaySpend?.apiCents ?? 0,
+                includedUsedCents: includedUsed
+            )
             todaySpend = TodaySpend(
-                totalCents: includedUsed,
-                autoCents: split?.autoCents ?? 0,
-                apiCents: split?.apiCents ?? 0
+                totalCents: reconciled.totalCents,
+                autoCents: reconciled.autoCents,
+                apiCents: reconciled.apiCents
             )
         }
 

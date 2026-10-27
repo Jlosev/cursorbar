@@ -5,6 +5,7 @@ enum CursorAPIError: Error, LocalizedError {
     case notAuthenticated
     case invalidResponse
     case httpError(statusCode: Int)
+    case incompleteEvents
 
     var errorDescription: String? {
         switch self {
@@ -14,6 +15,8 @@ enum CursorAPIError: Error, LocalizedError {
             "Could not parse usage data from Cursor."
         case .httpError(let statusCode):
             "Cursor API returned HTTP \(statusCode)."
+        case .incompleteEvents:
+            "Usage events were cut off before the day was fully counted."
         }
     }
 }
@@ -165,12 +168,11 @@ enum CursorAPI {
         let endMs = String(Int(Date().timeIntervalSince1970 * 1000))
 
         let pageSize = 100
-        let maxPages = 10
         var autoCents = 0.0
         var apiCents = 0.0
         var page = 1
 
-        while page <= maxPages {
+        pageLoop: while true {
             let result = try await requestUsageEventsPage(
                 credentials: credentials,
                 startMs: startMs,
@@ -187,10 +189,19 @@ enum CursorAPI {
                 }
             }
 
-            if page * pageSize >= result.totalUsageEventsCount || result.usageEventsDisplay.isEmpty {
-                break
+            switch UsageEventPager.decision(
+                page: page,
+                pageSize: pageSize,
+                eventsOnPage: result.usageEventsDisplay.count,
+                totalCount: result.totalUsageEventsCount
+            ) {
+            case .done:
+                break pageLoop
+            case .fetchNext:
+                page += 1
+            case .incomplete:
+                throw CursorAPIError.incompleteEvents
             }
-            page += 1
         }
 
         let auto = Int(autoCents.rounded())

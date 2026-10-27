@@ -168,6 +168,9 @@ final class PaceCalculatorTests: XCTestCase {
     func testPoolClassifier_namedModelsAreAPI() {
         XCTAssertEqual(UsagePoolClassifier.pool(forModel: "claude-opus-5-thinking-high"), .api)
         XCTAssertEqual(UsagePoolClassifier.pool(forModel: "gpt-5"), .api)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "grok-3"), .api)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "grok-4"), .api)
+        XCTAssertEqual(UsagePoolClassifier.pool(forModel: "grok-4.5"), .api)
         XCTAssertEqual(UsagePoolClassifier.pool(forModel: nil), .api)
         XCTAssertEqual(UsagePoolClassifier.pool(forModel: ""), .api)
     }
